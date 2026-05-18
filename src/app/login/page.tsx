@@ -1,102 +1,115 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/services/supabase/client";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/services/supabase/client";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setError("");
 
-    const { data: user, error } = await supabase
-      .from("usuarios")
-      .select("*")
-      .eq("email", email)
-      .eq("password", password)
-      .single();
+    try {
+      const { data, error: queryError } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .single();
 
-    if (error || !user) {
-      setError("Correo o contraseña incorrectos");
-      setLoading(false);
-    } else {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("pos_user", JSON.stringify(user));
+      if (queryError || !data) {
+        setError("Correo o contraseña incorrectos.");
+        setLoading(false);
+        return;
       }
+
+      // Guardar el usuario en localStorage para persistencia básica
+      localStorage.setItem("pos_user", JSON.stringify(data));
+
+      // Redirigir al dashboard
       router.push("/dashboard");
-      router.refresh();
+
+    } catch (err) {
+      console.error(err);
+      setError("Error de conexión al servidor.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-background transition-colors duration-300">
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-brand-4 rounded-full mix-blend-screen filter blur-[100px] opacity-40 animate-pulse"></div>
-        <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-brand-5 rounded-full mix-blend-screen filter blur-[100px] opacity-30 animate-pulse" style={{ animationDelay: "2s" }}></div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 relative overflow-hidden transition-colors duration-300 z-0">
+      {/* Fondo animado premium (Efecto Glassmorphism) */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
+        <div className="absolute top-[-10%] right-[-5%] w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-brand-4/30 rounded-full mix-blend-screen filter blur-[120px] opacity-60 animate-pulse"></div>
+        <div className="absolute bottom-[-10%] left-[-5%] w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-brand-5/30 rounded-full mix-blend-screen filter blur-[120px] opacity-50 animate-pulse" style={{ animationDelay: "2s" }}></div>
       </div>
 
-      <div className="w-full max-w-md bg-card border border-card-border p-8 rounded-2xl shadow-xl z-10 relative transition-colors duration-300">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-background border border-card-border rounded-2xl mx-auto flex items-center justify-center shadow-md mb-4 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+      <div className="w-full max-w-md bg-card/80 backdrop-blur-2xl p-6 sm:p-10 rounded-[32px] shadow-[0_8px_32px_rgba(0,41,70,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-white/20 dark:border-white/5 z-10 transition-all duration-300">
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-brand-3 to-brand-5 rounded-[24px] mx-auto flex items-center justify-center shadow-lg shadow-brand-4/30 mb-4 sm:mb-6 border border-white/10 transition-transform hover:scale-105 duration-300">
+            {/* Ícono de Papelería (Documento y Lápiz) */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-10 sm:w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight transition-colors">Papelería</h1>
-          <p className="text-brand-4 text-sm mt-2 font-medium">Panel Administrativo</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight transition-colors">Ciber-Papelería</h1>
+          <p className="text-brand-4 text-xs sm:text-sm mt-2 font-bold tracking-widest uppercase">Top-Running</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
           <div>
-            <label className="block text-sm font-medium text-brand-3 dark:text-brand-5 mb-2 transition-colors" htmlFor="email">
+            <label className="block text-sm font-bold text-foreground/70 mb-2 ml-1" htmlFor="email">
               Correo Electrónico
             </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-background border border-card-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-brand-5 focus:border-transparent transition-all"
-              placeholder="admin@gmail.com"
-              required
-            />
+            <div className="relative group">
+              <input
+                id="email"
+                type="email"
+                className="w-full bg-background border border-black/5 dark:border-white/5 text-foreground px-5 py-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-5/50 focus:border-brand-5 transition-all shadow-inner group-hover:border-brand-4/30"
+                placeholder="usuario@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-brand-3 dark:text-brand-5 mb-2 transition-colors" htmlFor="password">
+            <label className="block text-sm font-bold text-foreground/70 mb-2 ml-1" htmlFor="password">
               Contraseña
             </label>
-            <div className="relative">
+            <div className="relative group">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
+                className="w-full bg-background border border-black/5 dark:border-white/5 text-foreground px-5 py-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-5/50 focus:border-brand-5 transition-all shadow-inner group-hover:border-brand-4/30 pr-12"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-background border border-card-border rounded-xl px-4 py-3 pr-12 text-foreground focus:outline-none focus:ring-2 focus:ring-brand-5 focus:border-transparent transition-all"
-                placeholder="••••••••"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-brand-4 hover:text-brand-5 focus:outline-none transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-4 hover:text-brand-5 transition-colors p-1"
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
                 )}
               </button>
@@ -104,18 +117,15 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-500/50 text-red-500 dark:text-red-400 text-sm p-3 rounded-lg flex items-center gap-2 shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span>{error}</span>
+            <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm px-4 py-3 rounded-xl text-center font-medium">
+              {error}
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-brand-3 to-brand-4 hover:from-brand-4 hover:to-brand-5 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            className="w-full bg-gradient-to-r from-brand-3 to-brand-5 hover:from-brand-4 hover:to-brand-5 text-white font-bold py-4 px-4 rounded-2xl transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-brand-5/30 flex justify-center items-center mt-4"
           >
             {loading ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -128,6 +138,6 @@ export default function LoginPage() {
           </button>
         </form>
       </div>
-    </main>
+    </div>
   );
 }
