@@ -146,8 +146,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-3 md:gap-4">
             <div className="text-right">
-              <p className="text-xs md:text-sm font-bold text-foreground truncate max-w-[120px] md:max-w-[200px]">{user?.email}</p>
-              <p className="text-[10px] md:text-xs text-brand-3 dark:text-brand-5 uppercase tracking-widest font-semibold">{user?.rol || 'Admin'}</p>
+              <p className="text-[10px] md:text-xs text-brand-4 font-semibold uppercase tracking-wider mb-0.5">Bienvenido</p>
+              <p className="text-xs md:text-sm font-bold text-foreground truncate max-w-[120px] md:max-w-[200px]">{user?.nombre || user?.email?.split('@')[0] || 'Usuario'}</p>
             </div>
             <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-brand-3 to-brand-5 rounded-xl md:rounded-2xl flex items-center justify-center font-bold text-lg md:text-xl text-white shadow-lg shadow-brand-4/20 border border-white/10 flex-shrink-0">
               {user?.nombre?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'A'}
