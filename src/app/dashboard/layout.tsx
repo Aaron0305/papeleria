@@ -26,11 +26,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const storedUser = localStorage.getItem("pos_user");
     if (!storedUser) {
       router.push("/login");
-    } else {
-      setUser(JSON.parse(storedUser));
-      setLoading(false);
+      return;
     }
-  }, [router]);
+
+    const parsedUser = JSON.parse(storedUser);
+    setUser(parsedUser);
+
+    // Guardia de roles para cajero
+    if (parsedUser?.rol === "cajero") {
+      const allowedPaths = ["/dashboard/pos", "/dashboard/reportes"];
+      if (!allowedPaths.includes(pathname)) {
+        router.replace("/dashboard/pos");
+        return;
+      }
+    }
+
+    setLoading(false);
+  }, [router, pathname]);
 
   // KokonutUI: Update Sliding indicator dimensions on mount, pathname change, and window resizing
   useEffect(() => {
@@ -108,7 +120,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     },
   ];
 
-  const selectedItem = menuItems.find((item) => item.href === pathname);
+  const filteredMenuItems = menuItems.filter(item => {
+    if (user?.rol === "cajero") {
+      return item.name === "Punto de Venta" || item.name === "Reportes";
+    }
+    return true;
+  });
+
+  const selectedItem = filteredMenuItems.find((item) => item.href === pathname);;
 
   return (
     <div className="min-h-screen bg-background flex flex-col text-foreground transition-colors duration-300 relative overflow-clip">
@@ -168,7 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               />
             )}
 
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const isActive = pathname === item.href;
               const isLightBg = (item.name === "Punto de Venta" || item.name === "Reportes") && isActive;
               return (

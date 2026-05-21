@@ -1,16 +1,172 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/services/supabase/client";
+import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import JsBarcode from "jsbarcode";
+import jsPDF from "jspdf";
+
+// ─── SpotlightCard Constants ─────────────────────────────────────────────────
+const TILT_MAX = 9;
+const TILT_SPRING = { stiffness: 300, damping: 28 } as const;
+const GLOW_SPRING = { stiffness: 180, damping: 22 } as const;
+
+// ─── KPI SpotlightCard Component ─────────────────────────────────────────────
+interface KpiCardProps {
+  color: string;
+  label: string;
+  icon: string;
+  value: React.ReactNode;
+  subtitle: string;
+  dimmed: boolean;
+  onHoverStart: () => void;
+  onHoverEnd: () => void;
+  loading?: boolean;
+}
+
+function KpiCard({ color, label, icon, value, subtitle, dimmed, onHoverStart, onHoverEnd, loading }: KpiCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const normX = useMotionValue(0.5);
+  const normY = useMotionValue(0.5);
+
+  const rawRotateX = useTransform(normY, [0, 1], [TILT_MAX, -TILT_MAX]);
+  const rawRotateY = useTransform(normX, [0, 1], [-TILT_MAX, TILT_MAX]);
+
+  const rotateX = useSpring(rawRotateX, TILT_SPRING);
+  const rotateY = useSpring(rawRotateY, TILT_SPRING);
+  const glowOpacity = useSpring(0, GLOW_SPRING);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = cardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    normX.set((e.clientX - rect.left) / rect.width);
+    normY.set((e.clientY - rect.top) / rect.height);
+  };
+
+  const handleMouseEnter = () => {
+    glowOpacity.set(1);
+    onHoverStart();
+  };
+
+  const handleMouseLeave = () => {
+    normX.set(0.5);
+    normY.set(0.5);
+    glowOpacity.set(0);
+    onHoverEnd();
+  };
+
+  return (
+    <motion.div
+      ref={cardRef}
+      animate={{
+        scale: dimmed ? 0.96 : 1,
+        opacity: dimmed ? 0.45 : 1,
+      }}
+      className="group relative flex flex-col gap-4 overflow-hidden rounded-2xl border p-5 border-black/[0.06] bg-card dark:border-white/[0.06] dark:bg-card/40 transition-[border-color] duration-300 hover:border-black/[0.12] dark:hover:border-white/[0.14] cursor-default shadow-[0_8px_30px_rgb(0,0,0,0.02)]"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
+      style={{
+        rotateX,
+        rotateY,
+        transformPerspective: 900,
+      }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+    >
+      {/* Static accent tint */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-2xl"
+        style={{
+          background: `radial-gradient(ellipse at 20% 20%, ${color}18, transparent 65%)`,
+        }}
+      />
+
+      {/* Dynamic hover glow */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-2xl"
+        style={{
+          opacity: glowOpacity,
+          background: `radial-gradient(ellipse at 20% 20%, ${color}30, transparent 65%)`,
+        }}
+      />
+
+      {/* Shimmer sweep */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-[55%] -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent transition-transform duration-700 ease-out group-hover:translate-x-[280%]"
+      />
+
+      {/* Header: label + icon */}
+      <div className="relative z-10 flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-foreground/45">{label}</p>
+        <div
+          className="h-10 w-10 rounded-xl flex items-center justify-center"
+          style={{
+            background: `${color}15`,
+            boxShadow: `inset 0 0 0 1px ${color}25`,
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-[18px] w-[18px]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke={color}
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+          </svg>
+        </div>
+      </div>
+
+      {/* Value */}
+      <div className="relative z-10">
+        {loading ? (
+          <div className="h-9 w-28 rounded-lg animate-pulse" style={{ background: `${color}15` }}></div>
+        ) : (
+          <h3 className="text-[28px] font-black tracking-tight leading-none text-foreground">
+            {value}
+          </h3>
+        )}
+        <p className="mt-2 text-[11px] font-medium text-foreground/40">{subtitle}</p>
+      </div>
+
+      {/* Accent bottom line */}
+      <div
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 h-[2px] w-0 rounded-full transition-all duration-500 group-hover:w-full"
+        style={{
+          background: `linear-gradient(to right, ${color}90, transparent)`,
+        }}
+      />
+    </motion.div>
+  );
+}
 
 export default function ReportesPage() {
   const [ventas, setVentas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [eliminandoVenta, setEliminandoVenta] = useState(false);
+  const [user, setUser] = useState<any>(null);
   
   // Estados para ver el detalle de un ticket
   const [selectedVenta, setSelectedVenta] = useState<any | null>(null);
   const [detallesCargando, setDetallesCargando] = useState(false);
   const [detallesTicket, setDetallesTicket] = useState<any[]>([]);
+  
+  // Estados para edición de ventas y listado de cajeros (asíncrono)
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [editVentaModalOpen, setEditVentaModalOpen] = useState(false);
+  const [selectedVentaForEdit, setSelectedVentaForEdit] = useState<any | null>(null);
+  const [editVendedorId, setEditVendedorId] = useState<any>("");
+  const [editMetodoPago, setEditMetodoPago] = useState("Efectivo");
+  const [editTotal, setEditTotal] = useState("");
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   
   // Establecer la fecha de hoy por defecto (YYYY-MM-DD)
   const [fechaFiltro, setFechaFiltro] = useState<string>(
@@ -35,6 +191,95 @@ export default function ReportesPage() {
     setDetallesCargando(false);
   };
 
+  const handleReimprimirDirecto = async (venta: any) => {
+    setSelectedVenta(venta);
+    setDetallesCargando(true);
+    setDetallesTicket([]);
+    
+    const { data, error } = await supabase
+      .from("detalles_venta")
+      .select("*, productos(nombre, codigo_barras)")
+      .eq("venta_id", venta.id);
+      
+    if (!error && data) {
+      setDetallesTicket(data);
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    } else {
+      console.error("Error al cargar detalles para reimprimir:", error);
+      alert("No se pudieron obtener los detalles del ticket para reimprimir.");
+    }
+    setDetallesCargando(false);
+  };
+
+  const handleEliminarVenta = async (ventaId: any) => {
+    const confirmed = window.confirm(
+      "¿Estás seguro de que deseas eliminar permanentemente este ticket? Esto cancelará la venta, RESTAURARÁ el stock de los productos físicos en tu inventario y borrará el registro de la base de datos."
+    );
+    if (!confirmed) return;
+
+    setEliminandoVenta(true);
+
+    try {
+      // 1. Obtener detalles de venta para restaurar stock
+      const { data: detalles, error: detallesError } = await supabase
+        .from("detalles_venta")
+        .select("*")
+        .eq("venta_id", ventaId);
+
+      if (detallesError) throw detallesError;
+
+      // 2. Restaurar stock de productos físicos
+      if (detalles && detalles.length > 0) {
+        for (const item of detalles) {
+          // Ignorar el comodín de servicios (id: 9999)
+          if (item.producto_id !== 9999) {
+            // Obtener stock actual
+            const { data: prod, error: prodError } = await supabase
+              .from("productos")
+              .select("stock")
+              .eq("id", item.producto_id)
+              .single();
+
+            if (!prodError && prod) {
+              const nuevoStock = (prod.stock || 0) + item.cantidad;
+              await supabase
+                .from("productos")
+                .update({ stock: nuevoStock })
+                .eq("id", item.producto_id);
+            }
+          }
+        }
+      }
+
+      // 3. Eliminar de detalles_venta
+      const { error: delDetallesError } = await supabase
+        .from("detalles_venta")
+        .delete()
+        .eq("venta_id", ventaId);
+
+      if (delDetallesError) throw delDetallesError;
+
+      // 4. Eliminar de ventas
+      const { error: delVentaError } = await supabase
+        .from("ventas")
+        .delete()
+        .eq("id", ventaId);
+
+      if (delVentaError) throw delVentaError;
+
+      alert("Venta eliminada y stock restaurado exitosamente.");
+      setSelectedVenta(null);
+      fetchVentas();
+    } catch (error: any) {
+      console.error("Error al eliminar venta:", error);
+      alert("Ocurrió un error al eliminar la venta: " + (error.message || error));
+    } finally {
+      setEliminandoVenta(false);
+    }
+  };
+
   const fetchVentas = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -48,8 +293,92 @@ export default function ReportesPage() {
     setLoading(false);
   };
 
+  const fetchUsuarios = async () => {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id, nombre")
+      .order("nombre", { ascending: true });
+    if (!error && data) {
+      setUsuarios(data);
+    }
+  };
+
+  const generateTicketBarcodePDF = (venta: any) => {
+    const ticketNo = venta.ticket_numero || `TK-${venta.id.toString().padStart(6, '0')}`;
+    try {
+      const canvas = document.createElement("canvas");
+      JsBarcode(canvas, ticketNo, {
+        format: "CODE128",
+        width: 3,
+        height: 80,
+        displayValue: true,
+        fontSize: 20,
+        margin: 10
+      });
+      const imgData = canvas.toDataURL("image/png");
+      
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [50, 50]
+      });
+      
+      const imgWidth = 46;
+      const ratio = canvas.height / canvas.width;
+      const imgHeight = imgWidth * ratio; 
+      const x = (50 - imgWidth) / 2;
+      const y = (50 - imgHeight) / 2;
+      
+      pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+      pdf.save(`Codigo_Barras_${ticketNo}.pdf`);
+    } catch (e) {
+      alert("No se pudo generar el código de barras para este folio.");
+      console.error(e);
+    }
+  };
+
+  const openEditVentaModal = (venta: any) => {
+    setSelectedVentaForEdit(venta);
+    setEditVendedorId(venta.vendedor_id || "");
+    setEditMetodoPago(venta.metodo_pago || "Efectivo");
+    setEditTotal(Number(venta.total).toString());
+    setEditVentaModalOpen(true);
+  };
+
+  const handleGuardarEdicionVenta = async () => {
+    if (!selectedVentaForEdit) return;
+    setGuardandoEdicion(true);
+    try {
+      const { error } = await supabase
+        .from("ventas")
+        .update({
+          vendedor_id: editVendedorId || null,
+          metodo_pago: editMetodoPago,
+          total: Number(editTotal)
+        })
+        .eq("id", selectedVentaForEdit.id);
+
+      if (error) throw error;
+
+      alert("Venta actualizada exitosamente.");
+      setEditVentaModalOpen(false);
+      fetchVentas();
+    } catch (error: any) {
+      console.error("Error al actualizar venta:", error);
+      alert("Error al actualizar la venta: " + (error.message || error));
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  };
+
   useEffect(() => {
     fetchVentas();
+    fetchUsuarios();
+
+    const storedUser = localStorage.getItem("pos_user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
   }, []);
 
   // Filtrado por fecha
@@ -62,6 +391,7 @@ export default function ReportesPage() {
   // Totales
   const ingresosDelDia = ventasFiltradas.reduce((acc, v) => acc + Number(v.total), 0);
   const totalHistorico = ventas.reduce((acc, v) => acc + Number(v.total), 0);
+  const ticketPromedio = ventasFiltradas.length > 0 ? (ingresosDelDia / ventasFiltradas.length) : 0;
 
   return (
     <div className="space-y-6">
@@ -92,27 +422,52 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* Tarjetas de Resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-400 border-none rounded-3xl p-6 shadow-lg shadow-emerald-500/20 text-white relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          <p className="text-emerald-50 font-bold mb-1 opacity-90">
-            {fechaFiltro ? `Ingresos del Día (${fechaFiltro})` : 'Ingresos de Todas las Fechas'}
-          </p>
-          <h2 className="text-4xl font-black">${ingresosDelDia.toFixed(2)}</h2>
-        </div>
-        
-        <div className="bg-card border-none rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
-          <p className="text-brand-4 font-bold mb-1">
-            {fechaFiltro ? 'Ventas Realizadas Hoy' : 'Total de Ventas'}
-          </p>
-          <h2 className="text-4xl font-black text-foreground">{ventasFiltradas.length}</h2>
-        </div>
-
-        <div className="bg-gradient-to-br from-brand-4/10 to-transparent dark:from-brand-4/5 border-none rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
-          <p className="text-brand-4 font-bold mb-1">Total Histórico (Siempre)</p>
-          <h2 className="text-3xl font-black text-foreground opacity-70">${totalHistorico.toFixed(2)}</h2>
-        </div>
+      {/* Tarjetas de Resumen Spotlight — 3D Tilt + Glow + Shimmer */}
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ perspective: "1200px" }}>
+        <KpiCard
+          color="#00dfb2"
+          label="Ingresos Período"
+          icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          value={`$${ingresosDelDia.toFixed(2)}`}
+          subtitle={fechaFiltro ? `Filtrado por fecha (${fechaFiltro})` : "Total acumulado general"}
+          loading={loading}
+          dimmed={hoveredCard !== null && hoveredCard !== "ingresos"}
+          onHoverStart={() => setHoveredCard("ingresos")}
+          onHoverEnd={() => setHoveredCard(null)}
+        />
+        <KpiCard
+          color="#00a2f9"
+          label="Tickets Emitidos"
+          icon="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+          value={ventasFiltradas.length}
+          subtitle="Ventas registradas en el período"
+          loading={loading}
+          dimmed={hoveredCard !== null && hoveredCard !== "tickets"}
+          onHoverStart={() => setHoveredCard("tickets")}
+          onHoverEnd={() => setHoveredCard(null)}
+        />
+        <KpiCard
+          color="#f59e0b"
+          label="Ticket Promedio"
+          icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"
+          value={`$${ticketPromedio.toFixed(2)}`}
+          subtitle="Valor promedio de las ventas"
+          loading={loading}
+          dimmed={hoveredCard !== null && hoveredCard !== "promedio"}
+          onHoverStart={() => setHoveredCard("promedio")}
+          onHoverEnd={() => setHoveredCard(null)}
+        />
+        <KpiCard
+          color="#006199"
+          label="Total Histórico"
+          icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          value={`$${totalHistorico.toFixed(2)}`}
+          subtitle="Caja acumulada de todos los tiempos"
+          loading={loading}
+          dimmed={hoveredCard !== null && hoveredCard !== "historico"}
+          onHoverStart={() => setHoveredCard("historico")}
+          onHoverEnd={() => setHoveredCard(null)}
+        />
       </div>
 
       {/* Tabla de Ventas */}
@@ -130,18 +485,19 @@ export default function ReportesPage() {
                 <th className="p-5 font-bold">Cajero</th>
                 <th className="p-5 font-bold">Método</th>
                 <th className="p-5 font-bold text-right">Total</th>
+                <th className="p-5 font-bold text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-4/5 dark:divide-brand-4/10">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-brand-4 font-medium animate-pulse">
+                  <td colSpan={6} className="p-8 text-center text-brand-4 font-medium animate-pulse">
                     Cargando ventas...
                   </td>
                 </tr>
               ) : ventasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-brand-4">
+                  <td colSpan={6} className="p-8 text-center text-brand-4">
                     <div className="flex flex-col items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -171,6 +527,56 @@ export default function ReportesPage() {
                     </td>
                     <td className="p-5 text-right font-black text-emerald-500 text-lg">
                       ${Number(venta.total).toFixed(2)}
+                    </td>
+                    <td className="p-5 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-2">
+                        {/* Reimprimir Ticket (Habilitado para todos, incluyendo Cajero) */}
+                        <button
+                          onClick={() => handleReimprimirDirecto(venta)}
+                          className="p-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
+                          title="Reimprimir Ticket"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                          </svg>
+                        </button>
+
+                        {/* Acciones de Administrador */}
+                        {user?.rol !== "cajero" && (
+                          <>
+                            {/* Imprimir Código de Barras */}
+                            <button
+                              onClick={() => generateTicketBarcodePDF(venta)}
+                              className="p-2 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg transition-all"
+                              title="Imprimir Código de Barras del Ticket"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2zM9 16V8m3 8V8m3 8V8" />
+                              </svg>
+                            </button>
+                            {/* Editar */}
+                            <button
+                              onClick={() => openEditVentaModal(venta)}
+                              className="p-2 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white rounded-lg transition-all"
+                              title="Editar Venta"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            {/* Eliminar */}
+                            <button
+                              onClick={() => handleEliminarVenta(venta.id)}
+                              className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"
+                              title="Eliminar Venta"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -277,22 +683,163 @@ export default function ReportesPage() {
             </div>
 
             {/* Pie del Modal con Acciones */}
-            <div className="p-6 bg-card z-10 shadow-[0_-10px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_-10px_30px_rgb(0,0,0,0.1)] flex gap-3">
+            <div className="p-6 bg-card z-10 shadow-[0_-10px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_-10px_30px_rgb(0,0,0,0.1)] flex flex-col sm:flex-row gap-3">
+              {user?.rol !== "cajero" && (
+                <button 
+                  onClick={() => handleEliminarVenta(selectedVenta.id)}
+                  disabled={eliminandoVenta}
+                  className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold px-5 py-4 rounded-xl border border-red-500/20 shadow-sm transition-all flex items-center justify-center gap-2"
+                  title="Eliminar Venta permanentemente y devolver stock"
+                >
+                  {eliminandoVenta ? (
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
+                  <span>Eliminar</span>
+                </button>
+              )}
               <button 
                 onClick={() => window.print()}
-                disabled={detallesCargando || detallesTicket.length === 0}
-                className="flex-1 bg-gradient-to-r from-brand-3 to-brand-5 text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                disabled={detallesCargando || detallesTicket.length === 0 || eliminandoVenta}
+                className="flex-1 bg-gradient-to-r from-brand-3 to-brand-5 hover:from-brand-4 hover:to-brand-5 text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
-                Reimprimir Ticket
+                Reimprimir
               </button>
               <button 
                 onClick={() => setSelectedVenta(null)}
+                disabled={eliminandoVenta}
                 className="bg-card dark:bg-card/50 hover:bg-brand-4/10 text-foreground font-bold px-6 py-4 rounded-xl border border-brand-4/10 shadow-[0_4px_20px_rgb(0,0,0,0.03)] transition-all"
               >
                 Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Editar Venta */}
+      {editVentaModalOpen && selectedVentaForEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setEditVentaModalOpen(false)}></div>
+          <div className="relative bg-card border-none w-full max-w-md rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgb(0,0,0,0.3)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Cabecera del Modal */}
+            <div className="p-6 bg-brand-4/5 dark:bg-brand-4/10 flex justify-between items-center z-10 shadow-sm">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brand-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Editar Información de Venta
+              </h2>
+              <button 
+                onClick={() => setEditVentaModalOpen(false)} 
+                className="p-2 text-brand-4 hover:bg-red-500 hover:text-white rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Cuerpo del Modal */}
+            <div className="p-6 space-y-6 bg-background/30 dark:bg-background/10">
+              
+              {/* Información General (No Editable) */}
+              <div className="bg-card border-none p-4 rounded-2xl shadow-[0_4px_20px_rgb(0,0,0,0.02)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.08)] text-sm text-foreground">
+                <div className="flex justify-between">
+                  <span className="text-brand-4 font-bold">Folio original:</span>
+                  <span className="font-mono font-bold text-brand-5">{selectedVentaForEdit.ticket_numero || `TK-${selectedVentaForEdit.id.toString().padStart(6, '0')}`}</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-brand-4 font-bold">Fecha de Registro:</span>
+                  <span className="font-medium">{new Date(selectedVentaForEdit.fecha).toLocaleString('es-MX')}</span>
+                </div>
+              </div>
+
+              {/* Formulario Editable */}
+              <div className="space-y-4">
+                {/* Cajero / Vendedor */}
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-brand-4 mb-1.5 uppercase tracking-wider">Vendedor / Cajero</label>
+                  <select
+                    value={editVendedorId}
+                    onChange={(e) => setEditVendedorId(e.target.value)}
+                    className="w-full bg-card border border-brand-4/15 text-foreground rounded-xl py-3 px-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-5 focus:border-transparent transition-all font-bold"
+                  >
+                    <option value="">Anónimo / Sin Cajero</option>
+                    {usuarios.map((user) => (
+                      <option key={user.id} value={user.id}>{user.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Método de Pago */}
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-brand-4 mb-1.5 uppercase tracking-wider">Método de Pago</label>
+                  <select
+                    value={editMetodoPago}
+                    onChange={(e) => setEditMetodoPago(e.target.value)}
+                    className="w-full bg-card border border-brand-4/15 text-foreground rounded-xl py-3 px-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-5 focus:border-transparent transition-all font-bold"
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
+                    <option value="Transferencia">Transferencia Bancaria</option>
+                    <option value="Otros">Otros / Crédito</option>
+                  </select>
+                </div>
+
+                {/* Monto Total */}
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-brand-4 mb-1.5 uppercase tracking-wider">Monto Total de Venta ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editTotal}
+                    onChange={(e) => setEditTotal(e.target.value)}
+                    className="w-full bg-card border border-brand-4/15 text-foreground rounded-xl py-3 px-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-5 focus:border-transparent transition-all font-bold"
+                    placeholder="Monto de la venta"
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="p-6 bg-card z-10 shadow-[0_-10px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_-10px_30px_rgb(0,0,0,0.1)] flex gap-3">
+              <button 
+                onClick={() => setEditVentaModalOpen(false)}
+                disabled={guardandoEdicion}
+                className="flex-1 bg-card dark:bg-card/50 hover:bg-brand-4/10 text-foreground font-bold py-4 rounded-xl border border-brand-4/10 transition-all text-center"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleGuardarEdicionVenta}
+                disabled={guardandoEdicion || !editTotal || isNaN(Number(editTotal))}
+                className="flex-1 bg-gradient-to-r from-brand-3 to-brand-5 hover:from-brand-4 hover:to-brand-5 text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                {guardandoEdicion ? (
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                <span>Guardar Cambios</span>
               </button>
             </div>
 
