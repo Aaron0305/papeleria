@@ -41,7 +41,7 @@ export default function ReportesPage() {
   const totalHistorico = ventas.reduce((acc, v) => acc + Number(v.total), 0);
 
   return (
-    <div className="flex flex-col gap-6 h-[calc(100vh-8rem)]">
+    <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-extrabold text-foreground mb-2">Reportes y Ventas</h1>
