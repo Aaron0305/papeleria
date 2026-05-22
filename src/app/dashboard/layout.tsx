@@ -44,6 +44,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setLoading(false);
   }, [router, pathname]);
 
+  // Detección dinámica y activa en caliente del modo oscuro/claro del dispositivo
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    
+    const handleThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      const storedTheme = localStorage.getItem("theme");
+      if (!storedTheme) {
+        if (e.matches) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+    };
+
+    // Evaluar estado inicial en la hidratación cliente
+    handleThemeChange(mediaQuery);
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleThemeChange);
+    } else {
+      mediaQuery.addListener(handleThemeChange);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", handleThemeChange);
+      } else {
+        mediaQuery.removeListener(handleThemeChange);
+      }
+    };
+  }, []);
+
   // KokonutUI: Update Sliding indicator dimensions on mount, pathname change, and window resizing
   useEffect(() => {
     const updateDimensions = () => {

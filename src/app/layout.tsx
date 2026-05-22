@@ -29,7 +29,28 @@ export default function RootLayout({
     <html
       lang="es"
       className={cn("overflow-x-hidden", "antialiased", outfit.variable, geistMono.variable, "font-sans", inter.variable)}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const storedTheme = localStorage.getItem('theme');
+                  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  const theme = storedTheme || systemTheme;
+                  if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="overflow-x-hidden">{children}</body>
     </html>
   );

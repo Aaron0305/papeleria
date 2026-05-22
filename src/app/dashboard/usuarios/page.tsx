@@ -9,10 +9,12 @@ export default function UsuariosPage() {
   
   // Estados para el Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
   // Formulario
   const [formData, setFormData] = useState({
+    id: "",
     nombre: "",
     email: "",
     password: "",
@@ -37,7 +39,20 @@ export default function UsuariosPage() {
   }, []);
 
   const openNewModal = () => {
-    setFormData({ nombre: "", email: "", password: "", rol: "admin" });
+    setFormData({ id: "", nombre: "", email: "", password: "", rol: "admin" });
+    setIsEditing(false);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (usuario: any) => {
+    setFormData({
+      id: usuario.id,
+      nombre: usuario.nombre || "",
+      email: usuario.email || "",
+      password: "",
+      rol: usuario.rol || "admin"
+    });
+    setIsEditing(true);
     setModalOpen(true);
   };
 
@@ -56,22 +71,45 @@ export default function UsuariosPage() {
     e.preventDefault();
     setSaving(true);
     
-    const payload = {
+    const payload: any = {
       nombre: formData.nombre,
       email: formData.email,
-      password: formData.password,
       rol: formData.rol
     };
 
-    const { error } = await supabase
-      .from("usuarios")
-      .insert([payload]);
-      
-    if (!error) {
-      setModalOpen(false);
-      fetchUsuarios();
+    if (formData.password) {
+      payload.password = formData.password;
+    }
+
+    if (isEditing) {
+      const { error } = await supabase
+        .from("usuarios")
+        .update(payload)
+        .eq("id", formData.id);
+        
+      if (!error) {
+        setModalOpen(false);
+        fetchUsuarios();
+      } else {
+        alert("Error al actualizar: " + (error.message || "Error desconocido"));
+      }
     } else {
-      alert("Error al registrar. Verifica si el correo ya existe.");
+      if (!formData.password) {
+        alert("La contraseña es obligatoria para nuevos usuarios.");
+        setSaving(false);
+        return;
+      }
+      payload.password = formData.password;
+      const { error } = await supabase
+        .from("usuarios")
+        .insert([payload]);
+        
+      if (!error) {
+        setModalOpen(false);
+        fetchUsuarios();
+      } else {
+        alert("Error al registrar. Verifica si el correo ya existe.");
+      }
     }
     setSaving(false);
   };
@@ -142,7 +180,16 @@ export default function UsuariosPage() {
                         {usuario.rol || 'admin'}
                       </span>
                     </td>
-                    <td className="p-5 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="p-5 text-right space-x-2">
+                      <button 
+                        onClick={() => openEditModal(usuario)}
+                        className="text-black dark:text-brand-5 hover:bg-brand-4/10 dark:hover:bg-brand-5/10 p-2 rounded-xl transition-colors inline-flex"
+                        title="Editar"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
                       <button 
                         onClick={() => handleDelete(usuario.id)}
                         className="text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-colors inline-flex"
@@ -171,7 +218,7 @@ export default function UsuariosPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brand-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
-                Registrar Usuario
+                {isEditing ? "Editar Usuario" : "Registrar Usuario"}
               </h2>
               <button onClick={() => setModalOpen(false)} className="p-2 text-brand-4 hover:bg-red-500 hover:text-white rounded-full transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -205,14 +252,16 @@ export default function UsuariosPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-bold text-foreground mb-1 block">Contraseña *</label>
+                  <label className="text-sm font-bold text-foreground mb-1 block">
+                    Contraseña {isEditing ? "(Dejar en blanco para no cambiar)" : "*"}
+                  </label>
                   <input 
-                    required
+                    required={!isEditing}
                     type="password" 
                     value={formData.password}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all font-medium"
-                    placeholder="••••••••"
+                    placeholder={isEditing ? "Nueva contraseña (opcional)" : "••••••••"}
                   />
                 </div>
                 <div>
@@ -244,7 +293,7 @@ export default function UsuariosPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
-                  Registrar Cuenta
+                  {isEditing ? "Guardar Cambios" : "Registrar Cuenta"}
                 </button>
               </div>
             </form>

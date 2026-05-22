@@ -295,10 +295,10 @@ export default function InventarioPage() {
                         {producto.stock} uds
                       </span>
                     </td>
-                    <td className="p-5 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="p-5 text-right space-x-2">
                       <button 
                         onClick={() => generateBarcodePDF(producto)}
-                        className="text-brand-5 hover:bg-brand-5/10 p-2 rounded-xl transition-colors inline-flex"
+                        className="text-black dark:text-brand-5 hover:bg-brand-4/10 dark:hover:bg-brand-5/10 p-2 rounded-xl transition-colors inline-flex"
                         title="Generar Etiqueta Código de Barras PDF"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -307,7 +307,7 @@ export default function InventarioPage() {
                       </button>
                       <button 
                         onClick={() => openEditModal(producto)}
-                        className="text-brand-5 hover:bg-brand-5/10 p-2 rounded-xl transition-colors inline-flex"
+                        className="text-black dark:text-brand-5 hover:bg-brand-4/10 dark:hover:bg-brand-5/10 p-2 rounded-xl transition-colors inline-flex"
                         title="Editar"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -15,6 +15,7 @@ export default function POSPage() {
   const [ventaExitosa, setVentaExitosa] = useState(false);
   const [ultimoCambio, setUltimoCambio] = useState(0);
   const [ticketActivo, setTicketActivo] = useState<any>(null);
+  const [activeMobileTab, setActiveMobileTab] = useState<"catalogo" | "ticket">("catalogo");
 
   // Estados para el Modal de Servicio Variable
   const [modalServicioOpen, setModalServicioOpen] = useState(false);
@@ -408,8 +409,47 @@ export default function POSPage() {
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-10rem)]">
       
+      {/* Selector de Pestañas Móvil (Segmented Controls) */}
+      <div className="lg:hidden flex bg-card/85 backdrop-blur-md p-1.5 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] shadow-sm mb-4 w-full select-none">
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab("catalogo")}
+          className={cn(
+            "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2",
+            activeMobileTab === "catalogo"
+              ? "bg-brand-3 text-white shadow-md shadow-brand-3/25"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          )}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
+          </svg>
+          <span>Catálogo / Servicios</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMobileTab("ticket")}
+          className={cn(
+            "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 relative",
+            activeMobileTab === "ticket"
+              ? "bg-brand-5 text-brand-2 shadow-md shadow-brand-5/25"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          )}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17" />
+          </svg>
+          <span>Ver Ticket</span>
+          {carrito.length > 0 && (
+            <span className="absolute -top-1 right-2 bg-red-500 text-white font-extrabold text-[10px] w-5 h-5 rounded-full flex items-center justify-center animate-bounce shadow-md">
+              {carrito.reduce((acc, item) => acc + item.cantidad, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* PANEL IZQUIERDO: Búsqueda y Acciones Rápidas */}
-      <div className="flex-1 flex flex-col gap-6">
+      <div className={cn("flex-1 flex flex-col gap-6", activeMobileTab !== "catalogo" && "hidden lg:flex")}>
         
         {/* Buscador */}
         <div className="bg-card border-none p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
@@ -481,7 +521,10 @@ export default function POSPage() {
       </div>
 
       {/* PANEL DERECHO: Carrito (Ticket) */}
-      <div className="w-full lg:w-[450px] xl:w-[500px] bg-card border-none rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] flex flex-col overflow-hidden">
+      <div className={cn(
+        "w-full lg:w-[450px] xl:w-[500px] bg-card border-none rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] flex flex-col overflow-hidden",
+        activeMobileTab !== "ticket" && "hidden lg:flex"
+      )}>
         <div className="p-5 bg-brand-4/5 dark:bg-brand-4/10 flex justify-between items-center">
           <h2 className="text-xl font-bold text-foreground flex items-center gap-3">
             <span className="w-8 h-8 rounded-lg bg-brand-5/20 text-brand-5 flex items-center justify-center">
