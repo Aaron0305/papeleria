@@ -84,12 +84,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const container = containerRef.current;
 
       if (selectedButton && container) {
-        const rect = selectedButton.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-
         setDimensions({
-          width: rect.width,
-          left: rect.left - containerRect.left,
+          width: selectedButton.offsetWidth,
+          left: selectedButton.offsetLeft,
+        });
+
+        // Desplazar automáticamente el botón activo al centro de la barra en móviles
+        selectedButton.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
         });
       }
     };

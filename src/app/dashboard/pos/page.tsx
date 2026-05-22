@@ -473,13 +473,13 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setModalServicioOpen(true)}
-              className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-black px-6 rounded-2xl shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 flex-shrink-0 text-base"
+              className="bg-brand-2 hover:bg-brand-3 text-brand-5 border border-brand-5/30 font-black px-6 rounded-2xl shadow-lg shadow-brand-5/10 transition-all flex items-center gap-2 flex-shrink-0 text-base dark:bg-brand-5 dark:hover:bg-brand-4 dark:text-brand-2 dark:border-transparent dark:shadow-brand-5/20"
               title="Cobrar Copias, Impresiones, Trámites o Servicios"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5.5 w-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5.5 w-5.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span>⚡ Servicio Variable</span>
+              <span>Servicio Variable</span>
             </button>
           </form>
         </div>
