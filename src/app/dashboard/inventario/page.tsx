@@ -25,6 +25,44 @@ export default function InventarioPage() {
     stock: ""
   });
 
+  // Estados para el Modal de Alerta/Confirmación Personalizado
+  const [customConfirm, setCustomConfirm] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isAlert: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    isAlert: false,
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: true,
+      onConfirm: () => {}
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: false,
+      onConfirm: () => {
+        onConfirm();
+        setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
   const fetchProductos = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -82,7 +120,7 @@ export default function InventarioPage() {
 
   const generateBarcodePDF = (producto: any) => {
     if (!producto.codigo_barras) {
-      alert("Este producto no tiene código de barras registrado.");
+      showAlert("Código de Barras Requerido", "Este producto no tiene código de barras registrado.");
       return;
     }
     
@@ -113,7 +151,7 @@ export default function InventarioPage() {
       pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
       pdf.save(`Etiqueta_${producto.codigo_barras}.pdf`);
     } catch (e) {
-      alert("Formato de código de barras no válido.");
+      showAlert("Formato Inválido", "Formato de código de barras no válido.");
     }
   };
 
@@ -147,15 +185,19 @@ export default function InventarioPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("¿Estás seguro de eliminar este producto?")) {
-      const { error } = await supabase.from("productos").delete().eq("id", id);
-      if (!error) {
-        fetchProductos();
-      } else {
-        alert("Error al eliminar el producto");
+  const handleDelete = (id: string) => {
+    showConfirm(
+      "¿Eliminar Producto?",
+      "¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.",
+      async () => {
+        const { error } = await supabase.from("productos").delete().eq("id", id);
+        if (!error) {
+          fetchProductos();
+        } else {
+          showAlert("Error", "Error al eliminar el producto.");
+        }
       }
-    }
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,7 +227,7 @@ export default function InventarioPage() {
         fetchProductos();
       } else {
         console.error("Error update:", error);
-        alert(`Error al actualizar: ${error.message || 'Error desconocido'}`);
+        showAlert("Error al Actualizar", error.message || 'Error desconocido');
       }
     } else {
       const { error } = await supabase
@@ -197,10 +239,43 @@ export default function InventarioPage() {
         fetchProductos();
       } else {
         console.error("Error insert:", error);
-        alert(`Error al crear: ${error.message || 'Verifica si el código de barras ya existe.'}`);
+        showAlert("Error al Crear", error.message || 'Verifica si el código de barras ya existe.');
       }
     }
     setSaving(false);
+  };
+
+  const handleExportExcel = () => {
+    if (productos.length === 0) {
+      showAlert("Sin Productos", "No hay productos en el inventario para exportar.");
+      return;
+    }
+
+    const headers = ["Código de Barras", "Producto", "Precio Costo", "Precio Venta", "Ganancia", "Existencias (Stock)"];
+    const rows = productos.map(p => [
+      p.codigo_barras || "",
+      p.nombre,
+      p.precio_costo?.toFixed(2) || "0.00",
+      p.precio_venta?.toFixed(2) || "0.00",
+      (p.precio_venta - p.precio_costo)?.toFixed(2) || "0.00",
+      p.stock.toString()
+    ]);
+    
+    // Generar formato CSV UTF-8 con BOM para soportar correctamente caracteres en español en Excel
+    const csvContent = "\ufeff" + [
+      headers.join(","),
+      ...rows.map(r => r.map(val => `"${val.replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Inventario_Papeleria_${new Date().toLocaleDateString('es-MX').replace(/\//g, '-')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const productosFiltrados = productos.filter(p => 
@@ -232,6 +307,15 @@ export default function InventarioPage() {
               className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground rounded-2xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all font-medium"
             />
           </div>
+          <button 
+            onClick={handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-2xl shadow-md transition-all flex items-center gap-2 whitespace-nowrap"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Exportar a Excel
+          </button>
           <button 
             onClick={openNewModal}
             className="bg-brand-5 hover:bg-brand-4 text-background font-bold py-3 px-6 rounded-2xl shadow-md transition-all flex items-center gap-2 whitespace-nowrap"
@@ -486,6 +570,59 @@ export default function InventarioPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Confirmación Personalizado Premium */}
+      {customConfirm.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}></div>
+          <div className="relative bg-card border-none w-full max-w-sm rounded-3xl shadow-[0_20px_50px_rgb(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgb(0,0,0,0.3)] p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            {/* Icono decorativo */}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${customConfirm.isAlert ? 'bg-blue-500/10 text-blue-500' : 'bg-red-500/10 text-red-500'}`}>
+              {customConfirm.isAlert ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )}
+            </div>
+            
+            <h3 className="text-xl font-bold text-foreground mb-2">{customConfirm.title}</h3>
+            <p className="text-sm text-brand-4 mb-6 leading-relaxed">{customConfirm.message}</p>
+            
+            <div className="flex gap-3 w-full">
+              {!customConfirm.isAlert && (
+                <button
+                  type="button"
+                  onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 bg-brand-4/5 dark:bg-brand-4/10 hover:bg-brand-4/15 text-foreground font-bold py-3 rounded-xl transition-all text-sm border border-brand-4/10"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!customConfirm.isAlert) {
+                    customConfirm.onConfirm();
+                  } else {
+                    setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+                  }
+                }}
+                className={`flex-1 text-white font-extrabold py-3 rounded-xl transition-all text-sm shadow-md ${
+                  customConfirm.isAlert 
+                    ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/10' 
+                    : 'bg-red-500 hover:bg-red-600 shadow-red-500/10'
+                }`}
+              >
+                {customConfirm.isAlert ? 'Aceptar' : 'Confirmar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

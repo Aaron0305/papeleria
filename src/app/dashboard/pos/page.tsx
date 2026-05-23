@@ -30,7 +30,6 @@ export default function POSPage() {
   const [nuevoAtajoNombre, setNuevoAtajoNombre] = useState("");
   const [nuevoAtajoPrecio, setNuevoAtajoPrecio] = useState("");
   const [nuevoAtajoColor, setNuevoAtajoColor] = useState("purple");
-
   const colorMap: {[key: string]: { bg: string, text: string, border: string, hover: string }} = {
     purple: { bg: 'bg-purple-500/10 hover:bg-purple-500/20', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/20 hover:border-purple-500', hover: 'hover:bg-purple-500/10' },
     indigo: { bg: 'bg-indigo-500/10 hover:bg-indigo-500/20', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/20 hover:border-indigo-500', hover: 'hover:bg-indigo-500/10' },
@@ -41,6 +40,44 @@ export default function POSPage() {
     cyan: { bg: 'bg-cyan-500/10 hover:bg-cyan-500/20', text: 'text-cyan-600 dark:text-cyan-400', border: 'border-cyan-500/20 hover:border-cyan-500', hover: 'hover:bg-cyan-500/10' },
     teal: { bg: 'bg-teal-500/10 hover:bg-teal-500/20', text: 'text-teal-600 dark:text-teal-400', border: 'border-teal-500/20 hover:border-teal-500', hover: 'hover:bg-teal-500/10' },
     violet: { bg: 'bg-violet-500/10 hover:bg-violet-500/20', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-500/20 hover:border-violet-500', hover: 'hover:bg-violet-500/10' }
+  };
+
+  // Estados para el Modal de Alerta/Confirmación Personalizado
+  const [customConfirm, setCustomConfirm] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isAlert: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    isAlert: false,
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: true,
+      onConfirm: () => {}
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: false,
+      onConfirm: () => {
+        onConfirm();
+        setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
   
   // Totales
@@ -60,68 +97,105 @@ export default function POSPage() {
     }
   };
 
-  // Cargar servicios rápidos desde base de datos
+  // Cargar servicios rápidos desde base de datos e integrar con localStorage
   const fetchServiciosRapidos = async () => {
     setCargandoServicios(true);
+    
+    // Obtener locales de respaldo
+    const respaldo = [
+      { id: 1, nombre: "Impresión BN", color: "purple", precio_sugerido: 2.00 },
+      { id: 2, nombre: "Impresión Color", color: "indigo", precio_sugerido: 5.00 },
+      { id: 3, nombre: "Copia BN", color: "emerald", precio_sugerido: 2.00 },
+      { id: 4, nombre: "Copia Color", color: "pink", precio_sugerido: 5.00 },
+      { id: 5, nombre: "Escaneo / PDF", color: "amber", precio_sugerido: 10.00 },
+      { id: 6, nombre: "Trámite de Acta", color: "rose", precio_sugerido: 50.00 },
+      { id: 7, nombre: "Uso de Computadora", color: "cyan", precio_sugerido: 15.00 },
+      { id: 8, font: "", nombre: "Recibo de Luz / Pago", color: "teal", precio_sugerido: 10.00 },
+      { id: 9, nombre: "Servicio General", color: "violet", precio_sugerido: 0.00 }
+    ];
+
+    const localesStr = localStorage.getItem("pos_servicios_locales");
+    const locales = localesStr ? JSON.parse(localesStr) : [];
+
     const { data, error } = await supabase
       .from("servicios_rapidos")
       .select("*")
       .order("nombre", { ascending: true });
 
     if (!error && data) {
-      setServiciosRapidos(data);
+      // Evitar duplicar si por casualidad ya están en la base de datos
+      const dbNombres = new Set(data.map((s: any) => s.nombre.toLowerCase()));
+      const filtradosLocales = locales.filter((s: any) => !dbNombres.has(s.nombre.toLowerCase()));
+      setServiciosRapidos([...data, ...filtradosLocales].sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)));
     } else {
-      console.warn("No se pudieron cargar servicios rápidos dinámicos, usando predefinidos locales:", error);
-      // Resiliencia: si la tabla no existe en BD, usamos los de respaldo
-      const respaldo = [
-        { id: 1, nombre: "Impresión BN", color: "purple", precio_sugerido: 2.00 },
-        { id: 2, nombre: "Impresión Color", color: "indigo", precio_sugerido: 5.00 },
-        { id: 3, nombre: "Copia BN", color: "emerald", precio_sugerido: 2.00 },
-        { id: 4, nombre: "Copia Color", color: "pink", precio_sugerido: 5.00 },
-        { id: 5, nombre: "Escaneo / PDF", color: "amber", precio_sugerido: 10.00 },
-        { id: 6, nombre: "Trámite de Acta", color: "rose", precio_sugerido: 50.00 },
-        { id: 7, nombre: "Uso de Computadora", color: "cyan", precio_sugerido: 15.00 },
-        { id: 8, font: "", nombre: "Recibo de Luz / Pago", color: "teal", precio_sugerido: 10.00 },
-        { id: 9, nombre: "Servicio General", color: "violet", precio_sugerido: 0.00 }
-      ];
-      setServiciosRapidos(respaldo);
+      console.warn("No se pudieron cargar servicios rápidos dinámicos de BD, usando predefinidos y locales:", error);
+      setServiciosRapidos([...respaldo, ...locales].sort((a, b) => a.nombre.localeCompare(b.nombre)));
     }
     setCargandoServicios(false);
   };
 
   // Eliminar un servicio rápido de forma asíncrona
-  const eliminarServicioRapido = async (id: any) => {
+  const eliminarServicioRapido = (id: any) => {
     // Si es un id local de respaldo (número <= 9) no intentamos BD
     if (typeof id === 'number' && id <= 9) {
       setServiciosRapidos(prev => prev.filter(s => s.id !== id));
       return;
     }
     
-    const confirmed = window.confirm("¿Seguro que deseas eliminar este atajo de servicio?");
-    if (!confirmed) return;
+    showConfirm(
+      "¿Eliminar Atajo?",
+      "¿Seguro que deseas eliminar este atajo de servicio?",
+      async () => {
+        // Si es un id generado en localStorage
+        if (typeof id === 'string' && id.startsWith('local-')) {
+          const localesStr = localStorage.getItem("pos_servicios_locales");
+          if (localesStr) {
+            const locales = JSON.parse(localesStr);
+            const filtrados = locales.filter((s: any) => s.id !== id);
+            localStorage.setItem("pos_servicios_locales", JSON.stringify(filtrados));
+          }
+          fetchServiciosRapidos();
+          return;
+        }
 
-    const { error } = await supabase
-      .from("servicios_rapidos")
-      .delete()
-      .eq("id", id);
+        const { error } = await supabase
+          .from("servicios_rapidos")
+          .delete()
+          .eq("id", id);
 
-    if (!error) {
-      fetchServiciosRapidos();
-    } else {
-      alert("Error al eliminar el atajo de servicio de la base de datos.");
-    }
+        if (!error) {
+          // Remover también de localStorage por redundancia
+          const localesStr = localStorage.getItem("pos_servicios_locales");
+          if (localesStr) {
+            const locales = JSON.parse(localesStr);
+            const filtrados = locales.filter((s: any) => s.id !== id);
+            localStorage.setItem("pos_servicios_locales", JSON.stringify(filtrados));
+          }
+          fetchServiciosRapidos();
+        } else {
+          // Si falló Supabase por tabla inexistente pero estaba en local storage
+          const localesStr = localStorage.getItem("pos_servicios_locales");
+          if (localesStr) {
+            const locales = JSON.parse(localesStr);
+            const filtrados = locales.filter((s: any) => s.id !== id);
+            localStorage.setItem("pos_servicios_locales", JSON.stringify(filtrados));
+          }
+          fetchServiciosRapidos();
+        }
+      }
+    );
   };
 
-  // Guardar nuevo servicio rápido de forma asíncrona
+  // Guardar nuevo servicio rápido de forma asíncrona (Con local storage fallback)
   const guardarNuevoServicioRapido = async () => {
     if (!nuevoAtajoNombre.trim()) {
-      alert("Por favor introduce el nombre del atajo.");
+      showAlert("Nombre Requerido", "Por favor introduce el nombre del atajo.");
       return;
     }
 
     const precio = nuevoAtajoPrecio ? Number(nuevoAtajoPrecio) : 0.00;
     if (isNaN(precio) || precio < 0) {
-      alert("El precio sugerido debe ser un número válido mayor o igual a 0.");
+      showAlert("Precio Inválido", "El precio sugerido debe ser un número válido mayor o igual a 0.");
       return;
     }
 
@@ -140,21 +214,27 @@ export default function POSPage() {
       setCreandoAtajo(false);
       fetchServiciosRapidos();
     } else {
-      // Si la tabla de BD no existe o falló la inserción, lo insertamos al menos de forma local en memoria
-      console.warn("Fallo inserción en BD de servicios_rapidos, insertando en memoria local:", error);
+      console.warn("Fallo inserción en BD de servicios_rapidos, insertando en localStorage local:", error);
       const nuevoLocal = {
-        id: Date.now(),
+        id: `local-${Date.now()}`,
         nombre: nuevoAtajoNombre.trim(),
         color: nuevoAtajoColor,
         precio_sugerido: precio
       };
-      setServiciosRapidos(prev => [...prev, nuevoLocal].sort((a,b) => a.nombre.localeCompare(b.nombre)));
+      
+      // Guardar en localStorage
+      const localesStr = localStorage.getItem("pos_servicios_locales");
+      const locales = localesStr ? JSON.parse(localesStr) : [];
+      locales.push(nuevoLocal);
+      localStorage.setItem("pos_servicios_locales", JSON.stringify(locales));
       
       setNuevoAtajoNombre("");
       setNuevoAtajoPrecio("");
       setNuevoAtajoColor("purple");
       setCreandoAtajo(false);
-      alert("Atajo creado localmente. Por favor asegúrate de ejecutar el comando SQL en Supabase para que sea persistente.");
+      fetchServiciosRapidos();
+      
+      showAlert("Atajo Guardado", "Servicio guardado de forma persistente en tu navegador.");
     }
   };
 
@@ -181,7 +261,7 @@ export default function POSPage() {
     if (existe) {
       // Validar stock
       if (existe.cantidad >= producto.stock) {
-        alert("No hay suficiente stock para agregar más.");
+        showAlert("Sin Stock", "No hay suficiente stock para agregar más de este producto.");
         return;
       }
       setCarrito(carrito.map(item => 
@@ -191,11 +271,12 @@ export default function POSPage() {
       ));
     } else {
       if (producto.stock <= 0) {
-        alert("Este producto está agotado.");
+        showAlert("Agotado", "Este producto está agotado.");
         return;
       }
       setCarrito([...carrito, { 
         ...producto, 
+        shadow: false,
         cantidad: 1, 
         es_servicio: false, 
         carritoId: `prod-${producto.id}` 
@@ -216,7 +297,7 @@ export default function POSPage() {
       if (item.carritoId === carritoId) {
         const nuevaCantidad = item.cantidad + delta;
         if (!item.es_servicio && nuevaCantidad > item.stock) {
-          alert("Stock máximo alcanzado.");
+          showAlert("Sin Stock", "Stock máximo alcanzado para este producto.");
           return item;
         }
         return { ...item, cantidad: nuevaCantidad > 0 ? nuevaCantidad : 1 };
@@ -228,17 +309,17 @@ export default function POSPage() {
   // Agregar Servicio Rápido al Carrito
   const agregarServicioAlCarrito = () => {
     if (!servicioConcepto.trim()) {
-      alert("Por favor escribe el concepto del servicio.");
+      showAlert("Concepto Requerido", "Por favor escribe el concepto del servicio.");
       return;
     }
     const precio = Number(servicioPrecio);
     if (isNaN(precio) || precio <= 0) {
-      alert("Por favor ingresa un precio válido mayor a 0.");
+      showAlert("Precio Requerido", "Por favor ingresa un precio válido mayor a 0.");
       return;
     }
     const cantidad = Number(servicioCantidad);
     if (isNaN(cantidad) || cantidad <= 0) {
-      alert("Por favor ingresa una cantidad válida.");
+      showAlert("Cantidad Requerida", "Por favor ingresa una cantidad válida.");
       return;
     }
 
@@ -286,7 +367,7 @@ export default function POSPage() {
         setModalSearchTerm(busqueda);
         setModalProductosOpen(true);
       } else {
-        alert("Producto no encontrado");
+        showAlert("No Encontrado", "Producto no encontrado en inventario.");
       }
     }
   };
@@ -325,7 +406,7 @@ export default function POSPage() {
       .single();
 
     if (ventaError || !ventaData) {
-      alert("Error al registrar la venta.");
+      showAlert("Error al Cobrar", "No se pudo registrar la venta en el sistema.");
       console.error(ventaError);
       setProcesandoPago(false);
       return;
@@ -473,7 +554,7 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setModalServicioOpen(true)}
-              className="bg-brand-2 hover:bg-brand-3 text-brand-5 border border-brand-5/30 font-black px-6 rounded-2xl shadow-lg shadow-brand-5/10 transition-all flex items-center gap-2 flex-shrink-0 text-base dark:bg-brand-5 dark:hover:bg-brand-4 dark:text-brand-2 dark:border-transparent dark:shadow-brand-5/20"
+              className="bg-purple-600 hover:bg-purple-500 text-white font-black px-6 rounded-2xl shadow-lg shadow-purple-500/10 transition-all flex items-center gap-2 flex-shrink-0 text-base border-none dark:bg-purple-500 dark:hover:bg-purple-400 dark:text-white dark:shadow-purple-500/20"
               title="Cobrar Copias, Impresiones, Trámites o Servicios"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5.5 w-5.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1106,15 +1187,14 @@ export default function POSPage() {
         <div id="ticket-print" className="font-mono text-[9px] text-black bg-white w-[72mm] p-2 leading-tight">
           {/* Cabecera Estilo Comercial Premium */}
           <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0.5">
-            *** CIBER-PAPELERÍA ***
+            *** PAPELERÍA Y CIBER ***
           </div>
           <div className="text-center font-black text-xs uppercase tracking-widest mb-1 text-emerald-600">
             TOP-RUNNING
           </div>
           <div className="text-center text-[8px] text-gray-700 leading-tight mb-2">
-            Calle Principal #123, Col. Centro<br />
-            Apizaco, Tlaxcala, C.P. 90300<br />
-            Teléfono: 241-123-4567
+            San Jerónimo Ixtapantongo Centro, Manzana 2<br />
+            Teléfono: 7121654867
           </div>
           
           <div className="text-center text-[8px] mb-1.5 font-bold">
@@ -1193,6 +1273,59 @@ export default function POSPage() {
           <div className="text-center text-[7px] text-gray-600 mt-0.5">
             Conserve este ticket para cualquier aclaración.<br />
             ¡Esperamos verle pronto!
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Confirmación Personalizado Premium */}
+      {customConfirm.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}></div>
+          <div className="relative bg-card border-none w-full max-w-sm rounded-3xl shadow-[0_20px_50px_rgb(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgb(0,0,0,0.3)] p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            {/* Icono decorativo */}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${customConfirm.isAlert ? 'bg-blue-500/10 text-blue-500' : 'bg-red-500/10 text-red-500'}`}>
+              {customConfirm.isAlert ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )}
+            </div>
+            
+            <h3 className="text-xl font-bold text-foreground mb-2">{customConfirm.title}</h3>
+            <p className="text-sm text-brand-4 mb-6 leading-relaxed">{customConfirm.message}</p>
+            
+            <div className="flex gap-3 w-full">
+              {!customConfirm.isAlert && (
+                <button
+                  type="button"
+                  onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 bg-brand-4/5 dark:bg-brand-4/10 hover:bg-brand-4/15 text-foreground font-bold py-3 rounded-xl transition-all text-sm border border-brand-4/10"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!customConfirm.isAlert) {
+                    customConfirm.onConfirm();
+                  } else {
+                    setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+                  }
+                }}
+                className={`flex-1 text-white font-extrabold py-3 rounded-xl transition-all text-sm shadow-md ${
+                  customConfirm.isAlert 
+                    ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/10' 
+                    : 'bg-red-500 hover:bg-red-600 shadow-red-500/10'
+                }`}
+              >
+                {customConfirm.isAlert ? 'Aceptar' : 'Confirmar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

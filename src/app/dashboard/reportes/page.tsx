@@ -168,6 +168,48 @@ export default function ReportesPage() {
   const [editTotal, setEditTotal] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   
+  // Estados para el Modal de Alerta/Confirmación Personalizado
+  const [customConfirm, setCustomConfirm] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isAlert: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    isAlert: false,
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: true,
+      onConfirm: () => {}
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setCustomConfirm({
+      isOpen: true,
+      title,
+      message,
+      isAlert: false,
+      onConfirm: () => {
+        onConfirm();
+        setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  // Estados para Corte de Caja
+  const [corteModalOpen, setCorteModalOpen] = useState(false);
+  const [printMode, setPrintMode] = useState<"ticket" | "corte">("ticket");
+
   // Establecer la fecha de hoy por defecto (YYYY-MM-DD)
   const [fechaFiltro, setFechaFiltro] = useState<string>(
     new Date().toLocaleDateString('en-CA')
@@ -192,6 +234,7 @@ export default function ReportesPage() {
   };
 
   const handleReimprimirDirecto = async (venta: any) => {
+    setPrintMode("ticket");
     setSelectedVenta(venta);
     setDetallesCargando(true);
     setDetallesTicket([]);
@@ -208,76 +251,76 @@ export default function ReportesPage() {
       }, 150);
     } else {
       console.error("Error al cargar detalles para reimprimir:", error);
-      alert("No se pudieron obtener los detalles del ticket para reimprimir.");
+      showAlert("Error", "No se pudieron obtener los detalles del ticket para reimprimir.");
     }
     setDetallesCargando(false);
   };
 
-  const handleEliminarVenta = async (ventaId: any) => {
-    const confirmed = window.confirm(
-      "¿Estás seguro de que deseas eliminar permanentemente este ticket? Esto cancelará la venta, RESTAURARÁ el stock de los productos físicos en tu inventario y borrará el registro de la base de datos."
-    );
-    if (!confirmed) return;
+  const handleEliminarVenta = (ventaId: any) => {
+    showConfirm(
+      "¿Eliminar Ticket?",
+      "¿Estás seguro de que deseas eliminar permanentemente este ticket? Esto cancelará la venta, RESTAURARÁ el stock de los productos físicos en tu inventario y borrará el registro de la base de datos.",
+      async () => {
+        setEliminandoVenta(true);
+        try {
+          // 1. Obtener detalles de venta para restaurar stock
+          const { data: detalles, error: detallesError } = await supabase
+            .from("detalles_venta")
+            .select("*")
+            .eq("venta_id", ventaId);
 
-    setEliminandoVenta(true);
+          if (detallesError) throw detallesError;
 
-    try {
-      // 1. Obtener detalles de venta para restaurar stock
-      const { data: detalles, error: detallesError } = await supabase
-        .from("detalles_venta")
-        .select("*")
-        .eq("venta_id", ventaId);
+          // 2. Restaurar stock de productos físicos
+          if (detalles && detalles.length > 0) {
+            for (const item of detalles) {
+              // Ignorar el comodín de servicios (id: 9999)
+              if (item.producto_id !== 9999) {
+                // Obtener stock actual
+                const { data: prod, error: prodError } = await supabase
+                  .from("productos")
+                  .select("stock")
+                  .eq("id", item.producto_id)
+                  .single();
 
-      if (detallesError) throw detallesError;
-
-      // 2. Restaurar stock de productos físicos
-      if (detalles && detalles.length > 0) {
-        for (const item of detalles) {
-          // Ignorar el comodín de servicios (id: 9999)
-          if (item.producto_id !== 9999) {
-            // Obtener stock actual
-            const { data: prod, error: prodError } = await supabase
-              .from("productos")
-              .select("stock")
-              .eq("id", item.producto_id)
-              .single();
-
-            if (!prodError && prod) {
-              const nuevoStock = (prod.stock || 0) + item.cantidad;
-              await supabase
-                .from("productos")
-                .update({ stock: nuevoStock })
-                .eq("id", item.producto_id);
+                if (!prodError && prod) {
+                  const nuevoStock = (prod.stock || 0) + item.cantidad;
+                  await supabase
+                    .from("productos")
+                    .update({ stock: nuevoStock })
+                    .eq("id", item.producto_id);
+                }
+              }
             }
           }
+
+          // 3. Eliminar de detalles_venta
+          const { error: delDetallesError } = await supabase
+            .from("detalles_venta")
+            .delete()
+            .eq("venta_id", ventaId);
+
+          if (delDetallesError) throw delDetallesError;
+
+          // 4. Eliminar de ventas
+          const { error: delVentaError } = await supabase
+            .from("ventas")
+            .delete()
+            .eq("id", ventaId);
+
+          if (delVentaError) throw delVentaError;
+
+          showAlert("Venta Eliminada", "Venta eliminada y stock restaurado exitosamente.");
+          setSelectedVenta(null);
+          fetchVentas();
+        } catch (error: any) {
+          console.error("Error al eliminar venta:", error);
+          showAlert("Error", "Ocurrió un error al eliminar la venta: " + (error.message || error));
+        } finally {
+          setEliminandoVenta(false);
         }
       }
-
-      // 3. Eliminar de detalles_venta
-      const { error: delDetallesError } = await supabase
-        .from("detalles_venta")
-        .delete()
-        .eq("venta_id", ventaId);
-
-      if (delDetallesError) throw delDetallesError;
-
-      // 4. Eliminar de ventas
-      const { error: delVentaError } = await supabase
-        .from("ventas")
-        .delete()
-        .eq("id", ventaId);
-
-      if (delVentaError) throw delVentaError;
-
-      alert("Venta eliminada y stock restaurado exitosamente.");
-      setSelectedVenta(null);
-      fetchVentas();
-    } catch (error: any) {
-      console.error("Error al eliminar venta:", error);
-      alert("Ocurrió un error al eliminar la venta: " + (error.message || error));
-    } finally {
-      setEliminandoVenta(false);
-    }
+    );
   };
 
   const fetchVentas = async () => {
@@ -332,7 +375,7 @@ export default function ReportesPage() {
       pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
       pdf.save(`Codigo_Barras_${ticketNo}.pdf`);
     } catch (e) {
-      alert("No se pudo generar el código de barras para este folio.");
+      showAlert("Error", "No se pudo generar el código de barras para este folio.");
       console.error(e);
     }
   };
@@ -360,12 +403,12 @@ export default function ReportesPage() {
 
       if (error) throw error;
 
-      alert("Venta actualizada exitosamente.");
+      showAlert("Venta Actualizada", "Venta actualizada exitosamente.");
       setEditVentaModalOpen(false);
       fetchVentas();
     } catch (error: any) {
       console.error("Error al actualizar venta:", error);
-      alert("Error al actualizar la venta: " + (error.message || error));
+      showAlert("Error", "Error al actualizar la venta: " + (error.message || error));
     } finally {
       setGuardandoEdicion(false);
     }
@@ -393,6 +436,29 @@ export default function ReportesPage() {
   const totalHistorico = ventas.reduce((acc, v) => acc + Number(v.total), 0);
   const ticketPromedio = ventasFiltradas.length > 0 ? (ingresosDelDia / ventasFiltradas.length) : 0;
 
+  // Desglose de métodos de pago para el Corte
+  const desgloseMetodos = ventasFiltradas.reduce((acc, v) => {
+    const metodo = v.metodo_pago || 'Efectivo';
+    acc[metodo] = (acc[metodo] || 0) + Number(v.total);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const handleAbrirCorteModal = () => {
+    if (ventasFiltradas.length === 0) {
+      showAlert("Sin Ventas", "No hay ventas registradas en la fecha seleccionada para realizar un corte.");
+      return;
+    }
+    setPrintMode("corte");
+    setCorteModalOpen(true);
+  };
+
+  const handleImprimirCorte = () => {
+    setPrintMode("corte");
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
@@ -410,6 +476,16 @@ export default function ReportesPage() {
               className="bg-card dark:bg-background border-none text-foreground font-bold rounded-xl py-3 px-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all"
             />
           </div>
+          <button 
+            onClick={handleAbrirCorteModal}
+            className="bg-brand-5 hover:bg-brand-4 text-background font-black py-3 px-5 rounded-xl shadow-md transition-all flex items-center gap-2 h-[48px] self-end whitespace-nowrap"
+            title="Generar Corte de Caja de esta Fecha"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Corte de Caja
+          </button>
           <button 
             onClick={fetchVentas}
             className="bg-card dark:bg-background border-none text-brand-5 hover:bg-brand-5 hover:text-white font-bold py-3 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 h-[48px] self-end"
@@ -459,13 +535,13 @@ export default function ReportesPage() {
         />
         <KpiCard
           color="#006199"
-          label="Total Histórico"
+          label="Total por Día"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          value={`$${totalHistorico.toFixed(2)}`}
-          subtitle="Caja acumulada de todos los tiempos"
+          value={`$${ingresosDelDia.toFixed(2)}`}
+          subtitle={fechaFiltro ? `Caja del día (${fechaFiltro})` : "Caja del día de hoy"}
           loading={loading}
-          dimmed={hoveredCard !== null && hoveredCard !== "historico"}
-          onHoverStart={() => setHoveredCard("historico")}
+          dimmed={hoveredCard !== null && hoveredCard !== "diario"}
+          onHoverStart={() => setHoveredCard("diario")}
           onHoverEnd={() => setHoveredCard(null)}
         />
       </div>
@@ -848,19 +924,18 @@ export default function ReportesPage() {
       )}
 
       {/* TICKET IMPRIMIBLE HISTÓRICO (Solo visible al imprimir) */}
-      {selectedVenta && detallesTicket.length > 0 && (
+      {printMode === "ticket" && selectedVenta && detallesTicket.length > 0 && (
         <div id="ticket-print" className="font-mono text-[9px] text-black bg-white w-[72mm] p-2 leading-tight">
           {/* Cabecera Estilo Comercial Premium */}
           <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0.5">
-            *** CIBER-PAPELERÍA ***
+            *** PAPELERÍA Y CIBER ***
           </div>
           <div className="text-center font-black text-xs uppercase tracking-widest mb-1 text-emerald-600">
             TOP-RUNNING
           </div>
           <div className="text-center text-[8px] text-gray-700 leading-tight mb-2">
-            Calle Principal #123, Col. Centro<br />
-            Apizaco, Tlaxcala, C.P. 90300<br />
-            Teléfono: 241-123-4567
+            San Jerónimo Ixtapantongo Centro, Manzana 2<br />
+            Teléfono: 7121654867
           </div>
           
           <div className="text-center text-[8px] mb-1.5 font-bold">
@@ -919,12 +994,12 @@ export default function ReportesPage() {
               <span className="font-mono text-[11px]">${Number(selectedVenta.total).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-[8px] pt-0.5 text-gray-700">
-              <span>PAGO CON:</span>
-              <span className="font-mono">${Number(selectedVenta.total).toFixed(2)}</span>
+              <span>MÉTODO PAGO:</span>
+              <span className="uppercase">{selectedVenta.metodo_pago}</span>
             </div>
             <div className="flex justify-between font-bold text-[10px] pt-0.5 border-t border-dashed border-black/20">
-              <span>CAMBIO:</span>
-              <span className="font-mono text-[11px]">$0.00</span>
+              <span>ESTADO VENTA:</span>
+              <span>PAGADO</span>
             </div>
           </div>
           
@@ -943,7 +1018,248 @@ export default function ReportesPage() {
         </div>
       )}
 
-      {/* Estilos para impresión del Ticket Histórico - Garantiza 1 Sola Página */}
+      {/* CORTE DE CAJA IMPRIMIBLE (Solo visible al imprimir) */}
+      {printMode === "corte" && ventasFiltradas.length > 0 && (
+        <div id="corte-print" className="font-mono text-[9px] text-black bg-white w-[72mm] p-2 leading-tight">
+          <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0.5">
+            *** CORTE DE CAJA DIARIO ***
+          </div>
+          <div className="text-center font-black text-xs uppercase tracking-widest mb-1 text-emerald-600">
+            TOP-RUNNING
+          </div>
+          <div className="text-center text-[8px] text-gray-700 leading-tight mb-2">
+            San Jerónimo Ixtapantongo Centro, Manzana 2<br />
+            Teléfono: 7121654867
+          </div>
+          <div className="text-center text-[8px] mb-1.5 font-bold">
+            ------------------------------------------
+          </div>
+          
+          <div className="space-y-0.5 text-[8px] mb-2 font-medium">
+            <div className="flex justify-between">
+              <span>FECHA DEL CORTE:</span>
+              <span className="font-bold">{fechaFiltro || new Date().toLocaleDateString('en-CA')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>IMPRESO EL:</span>
+              <span>{new Date().toLocaleString('es-MX')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>TRANSACCIONES:</span>
+              <span className="font-bold">{ventasFiltradas.length}</span>
+            </div>
+          </div>
+
+          <div className="text-center text-[8px] mb-1 font-bold">
+            ==========================================
+          </div>
+
+          <div className="text-[8px] font-bold text-center my-1 uppercase">
+            RESUMEN DE INGRESOS
+          </div>
+
+          <div className="space-y-1 my-1.5 text-[8px]">
+            <div className="flex justify-between">
+              <span>EFECTIVO:</span>
+              <span className="font-mono">${(desgloseMetodos["Efectivo"] || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>TARJETA:</span>
+              <span className="font-mono">${(desgloseMetodos["Tarjeta"] || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>TRANSFERENCIA:</span>
+              <span className="font-mono">${(desgloseMetodos["Transferencia"] || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>OTROS / CRÉDITO:</span>
+              <span className="font-mono">${(desgloseMetodos["Otros"] || 0).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="text-center text-[8px] mb-1 font-bold">
+            ------------------------------------------
+          </div>
+
+          <div className="flex justify-between font-bold text-[10px] pt-1">
+            <span>TOTAL CAJA:</span>
+            <span className="font-mono text-[11px]">${ingresosDelDia.toFixed(2)}</span>
+          </div>
+
+          <div className="text-center text-[8px] my-2 font-bold">
+            ==========================================
+          </div>
+
+          <div className="text-[8px] font-bold text-center my-1 uppercase">
+            DESGLOSE DE TRANSACCIONES
+          </div>
+          <div className="space-y-1 my-1.5 text-[7px] leading-tight">
+            {ventasFiltradas.map((v, i) => (
+              <div key={i} className="flex justify-between">
+                <span>{v.ticket_numero || `TK-${v.id.toString().padStart(6, '0')}`} ({new Date(v.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})</span>
+                <span className="font-mono">${Number(v.total).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center text-[8px] my-4 font-bold">
+            ------------------------------------------
+          </div>
+
+          <div className="mt-8 flex flex-col gap-6 text-[8px] text-center uppercase">
+            <div className="border-t border-black w-2/3 mx-auto pt-1 mt-4">
+              FIRMA CAJERO
+            </div>
+            <div className="border-t border-black w-2/3 mx-auto pt-1 mt-4">
+              FIRMA ADMINISTRADOR
+            </div>
+          </div>
+          
+          <div className="text-center text-[7px] text-gray-600 mt-6">
+            Corte de caja generado correctamente.<br />
+            ¡TOP-RUNNING Sistemas de Control!
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Corte de Caja Visual */}
+      {corteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setCorteModalOpen(false)}></div>
+          <div className="relative bg-card border-none w-full max-w-md rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgb(0,0,0,0.3)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            <div className="p-6 bg-brand-4/5 dark:bg-brand-4/10 flex justify-between items-center z-10 shadow-sm">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brand-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Corte de Caja Diario
+              </h2>
+              <button 
+                onClick={() => setCorteModalOpen(false)} 
+                className="p-2 text-brand-4 hover:bg-red-500 hover:text-white rounded-full transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[60vh] bg-background/30 dark:bg-background/10">
+              
+              {/* Información General */}
+              <div className="bg-card border-none p-4 rounded-2xl shadow-sm space-y-2 text-sm text-foreground">
+                <div className="flex justify-between">
+                  <span className="text-brand-4 font-bold">Fecha del Corte:</span>
+                  <span className="font-bold text-brand-5">{fechaFiltro || new Date().toLocaleDateString('en-CA')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-brand-4 font-bold">Total Transacciones:</span>
+                  <span className="font-bold">{ventasFiltradas.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-brand-4 font-bold">Ticket Promedio:</span>
+                  <span className="font-bold">${ticketPromedio.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Desglose de Métodos de Pago */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-brand-4 uppercase tracking-wider">Ingresos por Método de Pago</label>
+                <div className="space-y-2">
+                  {['Efectivo', 'Tarjeta', 'Transferencia', 'Otros'].map((metodo) => (
+                    <div key={metodo} className="bg-card dark:bg-card/50 border-none p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+                      <span className="font-bold text-foreground text-sm">{metodo === 'Otros' ? 'Otros / Crédito' : metodo}</span>
+                      <span className="font-black text-emerald-500 text-base">${(desgloseMetodos[metodo] || 0).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gran Total */}
+              <div className="bg-card border-none p-5 rounded-2xl shadow-md flex justify-between items-center border border-emerald-500/10">
+                <span className="text-foreground font-extrabold text-base">Caja Total del Día</span>
+                <span className="text-3xl font-black text-emerald-500">${ingresosDelDia.toFixed(2)}</span>
+              </div>
+
+            </div>
+
+            <div className="p-6 bg-card z-10 shadow-[0_-10px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_-10px_30px_rgb(0,0,0,0.1)] flex gap-3">
+              <button 
+                onClick={() => { setPrintMode("corte"); setTimeout(window.print, 100); }}
+                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-white font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Imprimir Corte
+              </button>
+              <button 
+                onClick={() => setCorteModalOpen(false)}
+                className="bg-card dark:bg-card/50 hover:bg-brand-4/10 text-foreground font-bold px-6 py-4 rounded-xl border border-brand-4/10 shadow-sm transition-all"
+              >
+                Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Confirmación Personalizado Premium */}
+      {customConfirm.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}></div>
+          <div className="relative bg-card border-none w-full max-w-sm rounded-3xl shadow-[0_20px_50px_rgb(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgb(0,0,0,0.3)] p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            {/* Icono decorativo */}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${customConfirm.isAlert ? 'bg-blue-500/10 text-blue-500' : 'bg-red-500/10 text-red-500'}`}>
+              {customConfirm.isAlert ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              )}
+            </div>
+            
+            <h3 className="text-xl font-bold text-foreground mb-2">{customConfirm.title}</h3>
+            <p className="text-sm text-brand-4 mb-6 leading-relaxed">{customConfirm.message}</p>
+            
+            <div className="flex gap-3 w-full">
+              {!customConfirm.isAlert && (
+                <button
+                  type="button"
+                  onClick={() => setCustomConfirm(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 bg-brand-4/5 dark:bg-brand-4/10 hover:bg-brand-4/15 text-foreground font-bold py-3 rounded-xl transition-all text-sm border border-brand-4/10"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!customConfirm.isAlert) {
+                    customConfirm.onConfirm();
+                  } else {
+                    setCustomConfirm(prev => ({ ...prev, isOpen: false }));
+                  }
+                }}
+                className={`flex-1 text-white font-extrabold py-3 rounded-xl transition-all text-sm shadow-md ${
+                  customConfirm.isAlert 
+                    ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/10' 
+                    : 'bg-red-500 hover:bg-red-600 shadow-red-500/10'
+                }`}
+              >
+                {customConfirm.isAlert ? 'Aceptar' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Estilos para impresión del Ticket / Corte de Caja - Garantiza 1 Sola Página */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           html, body {
@@ -961,13 +1277,14 @@ export default function ReportesPage() {
             visibility: hidden !important;
           }
           
-          /* Hacer visible únicamente el ticket y sus descendientes */
-          #ticket-print, #ticket-print * {
+          /* Hacer visible el ticket o el corte correspondiente */
+          #ticket-print, #ticket-print *,
+          #corte-print, #corte-print * {
             visibility: visible !important;
           }
           
-          /* Colapsar el ticket en la posición fija 0,0 para que no sume espacio de otros elementos */
-          #ticket-print {
+          /* Colapsar en la posición fija 0,0 para que no sume espacio de otros elementos */
+          #ticket-print, #corte-print {
             visibility: visible !important;
             display: block !important;
             position: fixed !important;
@@ -994,7 +1311,7 @@ export default function ReportesPage() {
         }
         
         @media screen {
-          #ticket-print {
+          #ticket-print, #corte-print {
             display: none !important;
           }
         }
