@@ -554,7 +554,7 @@ export default function POSPage() {
             <button
               type="button"
               onClick={() => setModalServicioOpen(true)}
-              className="bg-purple-600 hover:bg-purple-500 text-white font-black px-6 rounded-2xl shadow-lg shadow-purple-500/10 transition-all flex items-center gap-2 flex-shrink-0 text-base border-none dark:bg-purple-500 dark:hover:bg-purple-400 dark:text-white dark:shadow-purple-500/20"
+              className="bg-brand-5 hover:bg-brand-4 text-brand-2 dark:text-[#001524] font-black px-6 rounded-2xl shadow-lg shadow-brand-5/10 hover:shadow-brand-4/10 transition-all flex items-center gap-2 flex-shrink-0 text-base border-none dark:bg-brand-5 dark:hover:bg-brand-4 dark:shadow-brand-5/25"
               title="Cobrar Copias, Impresiones, Trámites o Servicios"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5.5 w-5.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -643,7 +643,7 @@ export default function POSPage() {
               >
                 <button 
                   onClick={() => removerDelCarrito(item.carritoId)}
-                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-md z-10"
+                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all shadow-md z-10"
                   title="Eliminar"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -715,7 +715,7 @@ export default function POSPage() {
             {/* Cabecera del Modal */}
             <div className="p-6 bg-brand-4/5 dark:bg-brand-4/10 flex justify-between items-center z-10 shadow-sm">
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                <span className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-500 flex items-center justify-center">
+                <span className="w-8 h-8 rounded-lg bg-brand-5/20 text-brand-5 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
@@ -743,7 +743,7 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={() => setCreandoAtajo(true)}
-                      className="text-purple-500 hover:text-purple-600 dark:hover:text-purple-400 text-xs font-extrabold flex items-center gap-1 active:scale-95 transition-all"
+                      className="text-brand-5 hover:text-brand-4 dark:text-brand-5 dark:hover:text-brand-4 text-xs font-extrabold flex items-center gap-1 active:scale-95 transition-all"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -755,9 +755,9 @@ export default function POSPage() {
 
                 {/* Formulario de Nuevo Atajo en Línea */}
                 {creandoAtajo && (
-                  <div className="bg-purple-500/5 dark:bg-purple-950/10 border border-purple-500/20 p-4 rounded-2xl space-y-3.5 animate-in slide-in-from-top-2 duration-200 mb-4">
+                  <div className="bg-brand-5/5 dark:bg-brand-5/10 border border-brand-5/20 p-4 rounded-2xl space-y-3.5 animate-in slide-in-from-top-2 duration-200 mb-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs font-black text-purple-600 dark:text-purple-400 uppercase tracking-wider">Crear Nuevo Atajo</span>
+                      <span className="text-xs font-black text-brand-5 uppercase tracking-wider">Crear Nuevo Atajo</span>
                       <button 
                         type="button" 
                         onClick={() => setCreandoAtajo(false)}
@@ -776,7 +776,7 @@ export default function POSPage() {
                           placeholder="Ej. Copia Oficio BN"
                           value={nuevoAtajoNombre}
                           onChange={(e) => setNuevoAtajoNombre(e.target.value)}
-                          className="w-full bg-card border border-brand-4/10 text-foreground text-xs font-semibold rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
+                          className="w-full bg-card border border-brand-4/10 text-foreground text-xs font-semibold rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-brand-5 transition-all shadow-inner"
                         />
                       </div>
                       <div>
@@ -787,7 +787,7 @@ export default function POSPage() {
                           placeholder="0.00 (Opcional)"
                           value={nuevoAtajoPrecio}
                           onChange={(e) => setNuevoAtajoPrecio(e.target.value)}
-                          className="w-full bg-card border border-brand-4/10 text-foreground text-xs font-semibold rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
+                          className="w-full bg-card border border-brand-4/10 text-foreground text-xs font-semibold rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-brand-5 transition-all shadow-inner"
                         />
                       </div>
                     </div>
@@ -812,7 +812,7 @@ export default function POSPage() {
                               colorName === 'cyan' && "bg-cyan-500 border-cyan-600",
                               colorName === 'teal' && "bg-teal-500 border-teal-600",
                               colorName === 'violet' && "bg-violet-500 border-violet-600",
-                              nuevoAtajoColor === colorName ? "ring-2 ring-offset-2 ring-purple-500 scale-110" : "opacity-75"
+                              nuevoAtajoColor === colorName ? "ring-2 ring-offset-2 ring-brand-5 scale-110" : "opacity-75"
                             )}
                             title={colorName}
                           />
@@ -823,7 +823,7 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={guardarNuevoServicioRapido}
-                      className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md shadow-purple-500/10 active:scale-95"
+                      className="w-full bg-brand-5 hover:bg-brand-4 text-brand-2 dark:text-[#001524] font-bold text-xs py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-md shadow-brand-5/10 active:scale-95"
                     >
                       Guardar Atajo
                     </button>
@@ -857,7 +857,7 @@ export default function POSPage() {
                             colorMap[serv.color]?.text || "text-foreground",
                             colorMap[serv.color]?.border || "border-brand-4/20",
                             colorMap[serv.color]?.hover || "",
-                            servicioConcepto === serv.nombre && "ring-2 ring-purple-500 font-extrabold"
+                            servicioConcepto === serv.nombre && "ring-2 ring-brand-5 font-extrabold"
                           )}
                           title={`${serv.nombre} (${serv.precio_sugerido > 0 ? `$${serv.precio_sugerido}` : 'Precio Variable'})`}
                         >
@@ -891,7 +891,7 @@ export default function POSPage() {
                     placeholder="Ej. 5 Impresiones color e Investigación de imágenes"
                     value={servicioConcepto}
                     onChange={(e) => setServicioConcepto(e.target.value)}
-                    className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-bold rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-inner"
+                    className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-bold rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all shadow-inner"
                   />
                 </div>
 
@@ -910,7 +910,7 @@ export default function POSPage() {
                         placeholder="0.00"
                         value={servicioPrecio}
                         onChange={(e) => setServicioPrecio(e.target.value)}
-                        className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-black rounded-2xl py-3 pl-8 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-inner"
+                        className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-black rounded-2xl py-3 pl-8 pr-4 focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all shadow-inner"
                       />
                     </div>
                   </div>
@@ -925,7 +925,7 @@ export default function POSPage() {
                       placeholder="1"
                       value={servicioCantidad}
                       onChange={(e) => setServicioCantidad(e.target.value)}
-                      className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-bold rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-inner"
+                      className="w-full bg-brand-4/5 dark:bg-brand-4/10 border-none text-foreground font-bold rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-brand-5 transition-all shadow-inner"
                     />
                   </div>
                 </div>
@@ -937,7 +937,7 @@ export default function POSPage() {
               <button
                 type="button"
                 onClick={agregarServicioAlCarrito}
-                className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-extrabold py-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                className="flex-1 bg-gradient-to-r from-brand-3 to-brand-5 hover:from-brand-4 hover:to-brand-5 text-white font-extrabold py-4 rounded-xl shadow-lg shadow-brand-5/20 transition-all flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

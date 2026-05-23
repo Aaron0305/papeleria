@@ -194,7 +194,15 @@ export default function InventarioPage() {
         if (!error) {
           fetchProductos();
         } else {
-          showAlert("Error", "Error al eliminar el producto.");
+          console.error("Error al eliminar:", error);
+          if (error.code === "23503") {
+            showAlert(
+              "No se puede eliminar", 
+              "Este producto tiene ventas registradas en el historial de tu negocio. Para mantener tus reportes e ingresos correctos no es posible borrarlo físicamente. Te recomendamos editar su stock a 0."
+            );
+          } else {
+            showAlert("Error al Eliminar", error.message || "Error al eliminar el producto.");
+          }
         }
       }
     );
@@ -328,8 +336,8 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* Tabla de Productos */}
-      <div className="bg-card border-none rounded-3xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
+      {/* Tabla de Productos (Pantallas grandes) */}
+      <div className="hidden md:block bg-card border-none rounded-3xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -414,6 +422,96 @@ export default function InventarioPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Vista de Tarjetas para Móviles (Pantallas pequeñas) */}
+      <div className="grid grid-cols-1 gap-4 md:hidden">
+        {loading ? (
+          <div className="bg-card p-10 rounded-3xl text-center text-brand-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
+            <svg className="animate-spin h-8 w-8 mx-auto mb-3 text-brand-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Cargando inventario...
+          </div>
+        ) : productosFiltrados.length === 0 ? (
+          <div className="bg-card p-10 rounded-3xl text-center text-brand-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
+            <div className="bg-brand-4/5 dark:bg-brand-4/10 inline-flex p-5 rounded-full mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-brand-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <p className="text-lg font-medium text-foreground">No se encontraron productos</p>
+            <p className="text-sm mt-1">Intenta con otra búsqueda o agrega uno nuevo.</p>
+          </div>
+        ) : (
+          productosFiltrados.map((producto) => (
+            <div key={producto.id} className="bg-card border-none p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] flex flex-col gap-4 border border-brand-4/5 dark:border-brand-4/10">
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-mono text-brand-4 block mb-1">
+                    {producto.codigo_barras || 'Sin código'}
+                  </span>
+                  <h4 className="font-extrabold text-foreground text-base leading-snug break-words">
+                    {producto.nombre}
+                  </h4>
+                </div>
+                <span className="font-black text-emerald-500 text-xl flex-shrink-0">
+                  ${producto.precio_venta}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center bg-brand-4/5 dark:bg-brand-4/10 p-3 rounded-2xl">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-brand-4 font-bold uppercase tracking-wider leading-none mb-1">Costo / Ganancia</span>
+                  <span className="text-xs font-semibold text-foreground/80">
+                    ${producto.precio_costo?.toFixed(2) || '0.00'} / ${(producto.precio_venta - (producto.precio_costo || 0))?.toFixed(2)}
+                  </span>
+                </div>
+                <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${
+                  producto.stock > 10 ? 'bg-emerald-500/10 text-emerald-500' : 
+                  producto.stock > 0 ? 'bg-yellow-500/10 text-yellow-500' : 
+                  'bg-red-500/10 text-red-500'
+                }`}>
+                  {producto.stock} uds
+                </span>
+              </div>
+              
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={() => generateBarcodePDF(producto)}
+                  className="flex-1 bg-brand-4/10 hover:bg-brand-4/15 text-foreground py-3 px-2 rounded-xl transition-all text-xs font-bold flex items-center justify-center gap-1.5 border border-brand-4/5 dark:border-brand-4/10"
+                  title="Generar Etiqueta Código de Barras PDF"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                  <span>Etiqueta</span>
+                </button>
+                <button
+                  onClick={() => openEditModal(producto)}
+                  className="flex-1 bg-blue-500/10 hover:bg-blue-500/15 text-blue-500 py-3 px-2 rounded-xl transition-all text-xs font-bold flex items-center justify-center gap-1.5 border border-blue-500/5"
+                  title="Editar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Editar</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(producto.id)}
+                  className="flex-1 bg-red-500/10 hover:bg-red-500/15 text-red-500 py-3 px-2 rounded-xl transition-all text-xs font-bold flex items-center justify-center gap-1.5 border border-red-500/5"
+                  title="Eliminar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  <span>Eliminar</span>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Modal Agregar/Editar */}

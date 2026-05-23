@@ -77,7 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, []);
 
-  // KokonutUI: Update Sliding indicator dimensions on mount, pathname change, and window resizing
+  // KokonutUI: Actualizar dimensiones del indicador deslizante al cambiar ruta o redimensionar ventana
   useEffect(() => {
     const updateDimensions = () => {
       const selectedButton = buttonRefs.current.get(pathname);
@@ -87,13 +87,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setDimensions({
           width: selectedButton.offsetWidth,
           left: selectedButton.offsetLeft,
-        });
-
-        // Desplazar automáticamente el botón activo al centro de la barra en móviles
-        selectedButton.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-          inline: "center",
         });
       }
     };
@@ -106,6 +99,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", updateDimensions);
     };
+  }, [pathname]);
+
+  // Desplazar horizontalmente el contenedor para centrar la pestaña activa (Evita alterar el scroll vertical global)
+  useEffect(() => {
+    const selectedButton = buttonRefs.current.get(pathname);
+    const container = containerRef.current;
+
+    if (selectedButton && container) {
+      const containerWidth = container.offsetWidth;
+      const buttonWidth = selectedButton.offsetWidth;
+      const buttonLeft = selectedButton.offsetLeft;
+
+      container.scrollTo({
+        left: buttonLeft - containerWidth / 2 + buttonWidth / 2,
+        behavior: "smooth",
+      });
+    }
   }, [pathname]);
 
   const handleLogout = () => {
