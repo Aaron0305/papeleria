@@ -256,29 +256,28 @@ export default function ReportesPage() {
   @page { margin: 0; size: 80mm auto; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    width: 80mm;
-    padding: 1mm 3mm 3mm 3mm;
-    font-family: 'Courier New', Courier, monospace;
+    width: 72mm;
+    margin: 0 auto;
+    padding: 1mm 2mm 3mm 2mm;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.35;
     color: #000;
-    font-weight: 900;
-    -webkit-text-stroke: 0.3px #000;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .sep { border-bottom: 1px dashed #000; margin: 3px 0; }
-  .sep2 { border-bottom: 2px solid #000; margin: 3px 0; }
+  .sep { border-bottom: 1px dashed #000; margin: 4px 0; }
+  .sep2 { border-bottom: 2px solid #000; margin: 4px 0; }
   .row { display: flex; justify-content: space-between; }
   .total-row {
     display: flex; justify-content: space-between;
-    font-size: 15px; font-weight: 900;
-    padding: 3px 0;
+    font-size: 14px; font-weight: bold;
+    padding: 4px 0;
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000;
-    margin: 2px 0;
+    margin: 3px 0;
   }
-  .big { font-size: 15px; font-weight: 900; }
+  .big { font-size: 14px; font-weight: bold; }
 </style></head><body>
   <div class="center bold" style="font-size:14px;text-transform:uppercase;">PAPELERÍA Y CIBER</div>
   <div class="center bold" style="font-size:18px;text-transform:uppercase;margin-bottom:2px;">TOP-RUNNING</div>
@@ -588,14 +587,13 @@ export default function ReportesPage() {
   @page { margin: 0; size: 80mm auto; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    width: 80mm;
-    padding: 1mm 3mm 3mm 3mm;
-    font-family: 'Courier New', Courier, monospace;
+    width: 72mm;
+    margin: 0 auto;
+    padding: 1mm 2mm 3mm 2mm;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 11px;
     line-height: 1.3;
     color: #000;
-    font-weight: 900;
-    -webkit-text-stroke: 0.3px #000;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
@@ -604,13 +602,13 @@ export default function ReportesPage() {
   .row { display: flex; justify-content: space-between; }
   .total-row {
     display: flex; justify-content: space-between;
-    font-size: 13px; font-weight: 900;
+    font-size: 13px; font-weight: bold;
     padding: 3px 0;
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000;
     margin: 3px 0;
   }
-  .big { font-size: 13px; font-weight: 900; }
+  .big { font-size: 13px; font-weight: bold; }
 </style></head><body>
   <div class="center bold" style="font-size:12px;text-transform:uppercase;">*** CORTE DE CAJA DIARIO ***</div>
   <div class="center bold" style="font-size:16px;text-transform:uppercase;margin-bottom:2px;">TOP-RUNNING</div>
@@ -633,9 +631,6 @@ export default function ReportesPage() {
   <div style="margin-top:25px;display:flex;flex-direction:column;gap:20px;font-size:9px;text-align:center;text-transform:uppercase;">
     <div style="border-top:1px solid #000;width:150px;margin:0 auto;padding-top:2px;">FIRMA CAJERO</div>
     <div style="border-top:1px solid #000;width:150px;margin:0 auto;padding-top:2px;">FIRMA ADMINISTRADOR</div>
-  </div>
-  <div class="center" style="font-size:8px;margin-top:15px;color:#555;">
-    Corte de caja generado correctamente.<br>¡TOP-RUNNING Sistemas de Control!
   </div>
 </body></html>`;
 

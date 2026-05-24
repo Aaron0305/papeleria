@@ -262,29 +262,28 @@ export default function POSPage() {
   @page { margin: 0; size: 80mm auto; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    width: 80mm;
-    padding: 1mm 3mm 3mm 3mm;
-    font-family: 'Courier New', Courier, monospace;
+    width: 72mm;
+    margin: 0 auto;
+    padding: 1mm 2mm 3mm 2mm;
+    font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.35;
     color: #000;
-    font-weight: 900;
-    -webkit-text-stroke: 0.3px #000;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .sep { border-bottom: 1px dashed #000; margin: 3px 0; }
-  .sep2 { border-bottom: 2px solid #000; margin: 3px 0; }
+  .sep { border-bottom: 1px dashed #000; margin: 4px 0; }
+  .sep2 { border-bottom: 2px solid #000; margin: 4px 0; }
   .row { display: flex; justify-content: space-between; }
   .total-row {
     display: flex; justify-content: space-between;
-    font-size: 15px; font-weight: 900;
-    padding: 3px 0;
+    font-size: 14px; font-weight: bold;
+    padding: 4px 0;
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000;
-    margin: 2px 0;
+    margin: 3px 0;
   }
-  .big { font-size: 15px; font-weight: 900; }
+  .big { font-size: 14px; font-weight: bold; }
 </style></head><body>
   <div class="center bold" style="font-size:14px;text-transform:uppercase;">PAPELERÍA Y CIBER</div>
   <div class="center bold" style="font-size:18px;text-transform:uppercase;margin-bottom:2px;">TOP-RUNNING</div>
