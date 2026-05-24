@@ -555,11 +555,130 @@ export default function ReportesPage() {
     setCorteModalOpen(true);
   };
 
+  const imprimirCorteCajaIframe = () => {
+    if (ventasFiltradas.length === 0) return;
+
+    const desgloseHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>EFECTIVO:</span><span style="font-family:monospace;">$${(desgloseMetodos["Efectivo"] || 0).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>TARJETA:</span><span style="font-family:monospace;">$${(desgloseMetodos["Tarjeta"] || 0).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>TRANSFERENCIA:</span><span style="font-family:monospace;">$${(desgloseMetodos["Transferencia"] || 0).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>OTROS / CRÉDITO:</span><span style="font-family:monospace;">$${(desgloseMetodos["Otros"] || 0).toFixed(2)}</span>
+      </div>
+    `;
+
+    const transaccionesHTML = ventasFiltradas.map((v: any) => `
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>${v.ticket_numero || `TK-${v.id.toString().padStart(6, '0')}`} (${new Date(v.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})</span>
+        <span style="font-family:monospace;">$${Number(v.total).toFixed(2)}</span>
+      </div>
+    `).join('');
+
+    const fechaCorte = fechaFiltro || new Date().toLocaleDateString('en-CA');
+    const fechaImpresion = new Date().toLocaleString('es-MX');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Corte de Caja</title>
+<style>
+  @page { margin: 0; size: 80mm auto; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 80mm;
+    padding: 1mm 3mm 3mm 3mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    line-height: 1.3;
+    color: #000;
+    font-weight: 900;
+    -webkit-text-stroke: 0.3px #000;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .sep { border-bottom: 1px dashed #000; margin: 4px 0; }
+  .sep2 { border-bottom: 2px solid #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; }
+  .total-row {
+    display: flex; justify-content: space-between;
+    font-size: 13px; font-weight: 900;
+    padding: 3px 0;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+    margin: 3px 0;
+  }
+  .big { font-size: 13px; font-weight: 900; }
+</style></head><body>
+  <div class="center bold" style="font-size:12px;text-transform:uppercase;">*** CORTE DE CAJA DIARIO ***</div>
+  <div class="center bold" style="font-size:16px;text-transform:uppercase;margin-bottom:2px;">TOP-RUNNING</div>
+  <div class="center" style="font-size:9px;line-height:1.3;">San Jerónimo Ixtapantongo Centro, Mza 2<br>Tel: 7121654867</div>
+  <div class="sep"></div>
+  <div style="font-size:9px;margin:4px 0;line-height:1.4;">
+    <div class="row"><span>FECHA DEL CORTE:</span><span class="bold">${fechaCorte}</span></div>
+    <div class="row"><span>IMPRESO EL:</span><span>${fechaImpresion}</span></div>
+    <div class="row"><span>TRANSACCIONES:</span><span class="bold">${ventasFiltradas.length}</span></div>
+  </div>
+  <div class="sep2"></div>
+  <div class="center bold" style="font-size:10px;margin-bottom:4px;">RESUMEN DE INGRESOS</div>
+  ${desgloseHTML}
+  <div class="sep"></div>
+  <div class="total-row"><span>TOTAL CAJA:</span><span>$${ingresosDelDia.toFixed(2)}</span></div>
+  <div class="sep2"></div>
+  <div class="center bold" style="font-size:10px;margin-bottom:4px;">DESGLOSE DE TRANSACCIONES</div>
+  ${transaccionesHTML}
+  <div class="sep"></div>
+  <div style="margin-top:25px;display:flex;flex-direction:column;gap:20px;font-size:9px;text-align:center;text-transform:uppercase;">
+    <div style="border-top:1px solid #000;width:150px;margin:0 auto;padding-top:2px;">FIRMA CAJERO</div>
+    <div style="border-top:1px solid #000;width:150px;margin:0 auto;padding-top:2px;">FIRMA ADMINISTRADOR</div>
+  </div>
+  <div class="center" style="font-size:8px;margin-top:15px;color:#555;">
+    Corte de caja generado correctamente.<br>¡TOP-RUNNING Sistemas de Control!
+  </div>
+</body></html>`;
+
+    // Eliminar iframe de impresión anterior si existiera
+    const iframeExistente = document.getElementById("print-iframe");
+    if (iframeExistente) {
+      iframeExistente.remove();
+    }
+
+    // Crear un iframe invisible
+    const iframe = document.createElement("iframe");
+    iframe.id = "print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.bottom = "0";
+    iframe.style.right = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.style.opacity = "0";
+    
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const printWindow = iframe.contentWindow;
+      if (printWindow) {
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          setTimeout(() => {
+            iframe.remove();
+          }, 1000);
+        }, 250);
+      }
+    }
+  };
+
   const handleImprimirCorte = () => {
-    setPrintMode("corte");
-    setTimeout(() => {
-      window.print();
-    }, 150);
+    imprimirCorteCajaIframe();
   };
 
   return (
@@ -1028,109 +1147,7 @@ export default function ReportesPage() {
 
 
 
-      {/* CORTE DE CAJA IMPRIMIBLE (Solo visible al imprimir) */}
-      {printMode === "corte" && ventasFiltradas.length > 0 && (
-        <div id="corte-print" className="font-mono text-[9px] text-black bg-white w-[72mm] p-2 leading-tight">
-          <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0.5">
-            *** CORTE DE CAJA DIARIO ***
-          </div>
-          <div className="text-center font-black text-xs uppercase tracking-widest mb-1 text-emerald-600">
-            TOP-RUNNING
-          </div>
-          <div className="text-center text-[8px] text-gray-700 leading-tight mb-2">
-            San Jerónimo Ixtapantongo Centro, Manzana 2<br />
-            Teléfono: 7121654867
-          </div>
-          <div className="text-center text-[8px] mb-1.5 font-bold">
-            ------------------------------------------
-          </div>
-          
-          <div className="space-y-0.5 text-[8px] mb-2 font-medium">
-            <div className="flex justify-between">
-              <span>FECHA DEL CORTE:</span>
-              <span className="font-bold">{fechaFiltro || new Date().toLocaleDateString('en-CA')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>IMPRESO EL:</span>
-              <span>{new Date().toLocaleString('es-MX')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>TRANSACCIONES:</span>
-              <span className="font-bold">{ventasFiltradas.length}</span>
-            </div>
-          </div>
 
-          <div className="text-center text-[8px] mb-1 font-bold">
-            ==========================================
-          </div>
-
-          <div className="text-[8px] font-bold text-center my-1 uppercase">
-            RESUMEN DE INGRESOS
-          </div>
-
-          <div className="space-y-1 my-1.5 text-[8px]">
-            <div className="flex justify-between">
-              <span>EFECTIVO:</span>
-              <span className="font-mono">${(desgloseMetodos["Efectivo"] || 0).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>TARJETA:</span>
-              <span className="font-mono">${(desgloseMetodos["Tarjeta"] || 0).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>TRANSFERENCIA:</span>
-              <span className="font-mono">${(desgloseMetodos["Transferencia"] || 0).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>OTROS / CRÉDITO:</span>
-              <span className="font-mono">${(desgloseMetodos["Otros"] || 0).toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="text-center text-[8px] mb-1 font-bold">
-            ------------------------------------------
-          </div>
-
-          <div className="flex justify-between font-bold text-[10px] pt-1">
-            <span>TOTAL CAJA:</span>
-            <span className="font-mono text-[11px]">${ingresosDelDia.toFixed(2)}</span>
-          </div>
-
-          <div className="text-center text-[8px] my-2 font-bold">
-            ==========================================
-          </div>
-
-          <div className="text-[8px] font-bold text-center my-1 uppercase">
-            DESGLOSE DE TRANSACCIONES
-          </div>
-          <div className="space-y-1 my-1.5 text-[7px] leading-tight">
-            {ventasFiltradas.map((v, i) => (
-              <div key={i} className="flex justify-between">
-                <span>{v.ticket_numero || `TK-${v.id.toString().padStart(6, '0')}`} ({new Date(v.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})</span>
-                <span className="font-mono">${Number(v.total).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center text-[8px] my-4 font-bold">
-            ------------------------------------------
-          </div>
-
-          <div className="mt-8 flex flex-col gap-6 text-[8px] text-center uppercase">
-            <div className="border-t border-black w-2/3 mx-auto pt-1 mt-4">
-              FIRMA CAJERO
-            </div>
-            <div className="border-t border-black w-2/3 mx-auto pt-1 mt-4">
-              FIRMA ADMINISTRADOR
-            </div>
-          </div>
-          
-          <div className="text-center text-[7px] text-gray-600 mt-6">
-            Corte de caja generado correctamente.<br />
-            ¡TOP-RUNNING Sistemas de Control!
-          </div>
-        </div>
-      )}
 
       {/* MODAL: Corte de Caja Visual */}
       {corteModalOpen && (
@@ -1196,7 +1213,7 @@ export default function ReportesPage() {
 
             <div className="p-6 bg-card z-10 shadow-[0_-10px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_-10px_30px_rgb(0,0,0,0.1)] flex gap-3">
               <button 
-                onClick={() => { setPrintMode("corte"); setTimeout(window.print, 100); }}
+                onClick={imprimirCorteCajaIframe}
                 className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-white font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1269,60 +1286,7 @@ export default function ReportesPage() {
         </div>
       )}
 
-      {/* Estilos para impresión - Optimizado para POS80 (80mm) */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          html, body {
-            background: white !important;
-            color: black !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 80mm !important;
-            height: auto !important;
-            overflow: hidden !important;
-          }
-          
-          body * {
-            visibility: hidden !important;
-          }
-          
-          #corte-print, #corte-print * {
-            visibility: visible !important;
-            color: black !important;
-          }
-          
-          #corte-print {
-            visibility: visible !important;
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 80mm !important;
-            margin: 0 !important;
-            padding: 1mm 2mm 2mm 2mm !important;
-            box-sizing: border-box !important;
-            background: white !important;
-            color: black !important;
-            font-family: 'Courier New', Courier, monospace !important;
-            font-size: 11px !important;
-            line-height: 1.3 !important;
-            page-break-inside: avoid !important;
-            page-break-after: avoid !important;
-          }
-          
-          @page {
-            margin: 0 !important;
-            padding: 0 !important;
-            size: 80mm auto !important;
-          }
-        }
-        
-        @media screen {
-          #corte-print {
-            display: none !important;
-          }
-        }
-      `}} />
+
 
     </div>
   );
