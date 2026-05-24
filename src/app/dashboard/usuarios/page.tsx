@@ -57,12 +57,47 @@ export default function UsuariosPage() {
   };
 
   const handleDelete = async (id: string) => {
+    // 1. Evitar que el usuario elimine su propia cuenta activa
+    try {
+      const storedUser = localStorage.getItem("pos_user");
+      if (storedUser) {
+        const currentUser = JSON.parse(storedUser);
+        if (currentUser.id === id) {
+          alert("No puedes eliminar tu propia cuenta de usuario activa.");
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Error al verificar usuario actual:", e);
+    }
+
     if (window.confirm("¿Estás seguro de eliminar este usuario? No podrá volver a iniciar sesión.")) {
+      // 2. Desvincular ventas asociadas a este vendedor para evitar violación de clave foránea (Foreign Key restriction)
+      try {
+        const { error: updateError } = await supabase
+          .from("ventas")
+          .update({ vendedor_id: null })
+          .eq("vendedor_id", id);
+
+        if (updateError) {
+          console.error("Error de Supabase al desvincular ventas:", updateError);
+          alert("No se pudieron desvincular las ventas del usuario: " + (updateError.message || "Error de red o permisos"));
+          return;
+        }
+      } catch (e: any) {
+        console.error("Error excepcional al desvincular ventas del usuario:", e);
+        alert("Ocurrió un error inesperado al desvincular las ventas: " + (e.message || e));
+        return;
+      }
+
+      // 3. Eliminar el usuario de la base de datos
       const { error } = await supabase.from("usuarios").delete().eq("id", id);
+      
       if (!error) {
         fetchUsuarios();
       } else {
-        alert("Error al eliminar el usuario");
+        console.error("Error al eliminar el usuario de la base de datos:", error);
+        alert("Error al eliminar el usuario: " + (error.message || "Error desconocido"));
       }
     }
   };

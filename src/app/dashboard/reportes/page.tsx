@@ -233,8 +233,113 @@ export default function ReportesPage() {
     setDetallesCargando(false);
   };
 
+  // Función para imprimir ticket histórico usando ventana emergente (elimina el problema de las 43 páginas)
+  const imprimirTicketHistorico = (venta: any, detalles: any[]) => {
+    if (!venta || !detalles || detalles.length === 0) return;
+    
+    const productosHTML = detalles.map((item: any) => `
+      <div style="margin-bottom:4px;">
+        <div style="font-weight:bold;text-transform:uppercase;">${item.descripcion_personalizada || item.productos?.nombre || 'Producto Eliminado'}</div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>${item.cantidad} x $${Number(item.precio_unitario).toFixed(2)}</span>
+          <span style="font-weight:bold;">$${(Number(item.precio_unitario) * item.cantidad).toFixed(2)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    const folio = venta.ticket_numero || `TK-${venta.id.toString().padStart(6, '0')}`;
+    const fechaFormateada = new Date(venta.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+    const vendedor = venta.usuarios?.nombre || 'ANÓNIMO';
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket Reimpreso</title>
+<style>
+  @page { margin: 0; size: 80mm auto; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 80mm;
+    padding: 1mm 3mm 3mm 3mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+    font-weight: 900;
+    -webkit-text-stroke: 0.3px #000;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .sep { border-bottom: 1px dashed #000; margin: 3px 0; }
+  .sep2 { border-bottom: 2px solid #000; margin: 3px 0; }
+  .row { display: flex; justify-content: space-between; }
+  .total-row {
+    display: flex; justify-content: space-between;
+    font-size: 15px; font-weight: 900;
+    padding: 3px 0;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+    margin: 2px 0;
+  }
+  .big { font-size: 15px; font-weight: 900; }
+</style></head><body>
+  <div class="center bold" style="font-size:14px;text-transform:uppercase;">PAPELERÍA Y CIBER</div>
+  <div class="center bold" style="font-size:18px;text-transform:uppercase;margin-bottom:2px;">TOP-RUNNING</div>
+  <div class="center" style="font-size:10px;line-height:1.3;">San Jerónimo Ixtapantongo Centro, Mza 2<br>Tel: 7121654867</div>
+  <div class="sep"></div>
+  <div class="center" style="margin:3px 0;">
+    Folio: <strong>${folio}</strong><br>
+    ${fechaFormateada}<br>
+    Atendió: <strong style="text-transform:uppercase;">${vendedor}</strong>
+  </div>
+  <div class="sep2"></div>
+  ${productosHTML}
+  <div class="sep2"></div>
+  <div class="row"><span>SUBTOTAL:</span><span class="bold">$${Number(venta.total).toFixed(2)}</span></div>
+  <div class="total-row"><span>TOTAL:</span><span>$${Number(venta.total).toFixed(2)}</span></div>
+  <div class="row"><span>MÉTODO DE PAGO:</span><span style="text-transform:uppercase;">${venta.metodo_pago}</span></div>
+  <div class="sep"></div>
+  <div class="center bold" style="margin:3px 0; font-size:13px;">REIMPRESIÓN DE TICKET</div>
+  <div class="center" style="font-size:10px;">Gracias por su preferencia.</div>
+</body></html>`;
+
+    // Eliminar iframe de impresión anterior si existiera
+    const iframeExistente = document.getElementById("print-iframe");
+    if (iframeExistente) {
+      iframeExistente.remove();
+    }
+
+    // Crear un iframe invisible
+    const iframe = document.createElement("iframe");
+    iframe.id = "print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.bottom = "0";
+    iframe.style.right = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.style.opacity = "0";
+    
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      const printWindow = iframe.contentWindow;
+      if (printWindow) {
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          // Remover el iframe después de un tiempo prudente
+          setTimeout(() => {
+            iframe.remove();
+          }, 1000);
+        }, 250);
+      }
+    }
+  };
+
   const handleReimprimirDirecto = async (venta: any) => {
-    setPrintMode("ticket");
     setSelectedVenta(venta);
     setDetallesCargando(true);
     setDetallesTicket([]);
@@ -246,9 +351,7 @@ export default function ReportesPage() {
       
     if (!error && data) {
       setDetallesTicket(data);
-      setTimeout(() => {
-        window.print();
-      }, 150);
+      imprimirTicketHistorico(venta, data);
     } else {
       console.error("Error al cargar detalles para reimprimir:", error);
       showAlert("Error", "No se pudieron obtener los detalles del ticket para reimprimir.");
@@ -781,7 +884,7 @@ export default function ReportesPage() {
                 </button>
               )}
               <button 
-                onClick={() => window.print()}
+                onClick={() => imprimirTicketHistorico(selectedVenta, detallesTicket)}
                 disabled={detallesCargando || detallesTicket.length === 0 || eliminandoVenta}
                 className="flex-1 bg-gradient-to-r from-brand-3 to-brand-5 hover:from-brand-4 hover:to-brand-5 text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold py-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
               >
@@ -923,100 +1026,7 @@ export default function ReportesPage() {
         </div>
       )}
 
-      {/* TICKET IMPRIMIBLE HISTÓRICO (Solo visible al imprimir) */}
-      {printMode === "ticket" && selectedVenta && detallesTicket.length > 0 && (
-        <div id="ticket-print" className="font-mono text-[9px] text-black bg-white w-[72mm] p-2 leading-tight">
-          {/* Cabecera Estilo Comercial Premium */}
-          <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0.5">
-            *** PAPELERÍA Y CIBER ***
-          </div>
-          <div className="text-center font-black text-xs uppercase tracking-widest mb-1 text-emerald-600">
-            TOP-RUNNING
-          </div>
-          <div className="text-center text-[8px] text-gray-700 leading-tight mb-2">
-            San Jerónimo Ixtapantongo Centro, Manzana 2<br />
-            Teléfono: 7121654867
-          </div>
-          
-          <div className="text-center text-[8px] mb-1.5 font-bold">
-            ------------------------------------------
-          </div>
-          
-          {/* Datos del Ticket */}
-          <div className="space-y-0.5 text-[8px] mb-2 font-medium">
-            <div className="flex justify-between">
-              <span>FOLIO TICKET:</span>
-              <span className="font-bold">{selectedVenta.ticket_numero || `TK-${selectedVenta.id.toString().padStart(6, '0')}`}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>FECHA:</span>
-              <span>{new Date(selectedVenta.fecha).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>ATENDIÓ:</span>
-              <span className="uppercase">{selectedVenta.usuarios?.nombre || 'ANÓNIMO'}</span>
-            </div>
-          </div>
-          
-          <div className="text-center text-[8px] mb-1 font-bold">
-            ==========================================
-          </div>
-          
-          {/* Tabla de Productos */}
-          <div className="text-[8px] font-bold flex justify-between my-0.5 pb-0.5 border-b border-dashed border-black/40">
-            <span className="w-[30px] text-left">CANT</span>
-            <span className="flex-1 text-left px-1">PRODUCTO</span>
-            <span className="w-[60px] text-right">IMPORTE</span>
-          </div>
-          
-          <div className="space-y-1 my-1.5">
-            {detallesTicket.map((item: any, idx: number) => (
-              <div key={idx} className="flex justify-between items-start text-[8px] leading-tight">
-                <span className="w-[30px] text-left font-bold">{item.cantidad}x</span>
-                <span className="flex-1 text-left px-1 uppercase break-words line-clamp-2">{item.descripcion_personalizada || item.productos?.nombre || 'Producto Eliminado'}</span>
-                <span className="w-[60px] text-right font-mono">${(Number(item.precio_unitario) * item.cantidad).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-          
-          <div className="text-center text-[8px] my-1 font-bold">
-            ------------------------------------------
-          </div>
-          
-          {/* Totales */}
-          <div className="space-y-1 text-[8px] pt-0.5">
-            <div className="flex justify-between">
-              <span>SUBTOTAL:</span>
-              <span className="font-mono">${Number(selectedVenta.total).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-[10px] pt-1 border-t border-dotted border-black/40">
-              <span>TOTAL A PAGAR:</span>
-              <span className="font-mono text-[11px]">${Number(selectedVenta.total).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-[8px] pt-0.5 text-gray-700">
-              <span>MÉTODO PAGO:</span>
-              <span className="uppercase">{selectedVenta.metodo_pago}</span>
-            </div>
-            <div className="flex justify-between font-bold text-[10px] pt-0.5 border-t border-dashed border-black/20">
-              <span>ESTADO VENTA:</span>
-              <span>PAGADO</span>
-            </div>
-          </div>
-          
-          <div className="text-center text-[8px] my-2 font-bold">
-            ==========================================
-          </div>
-          
-          {/* Pie de Ticket Emotivo */}
-          <div className="text-center text-[9px] font-bold uppercase tracking-wider italic">
-            *** REIMPRESIÓN DE TICKET ***
-          </div>
-          <div className="text-center text-[7px] text-gray-600 mt-0.5">
-            Gracias por su preferencia e historial.<br />
-            ¡Esperamos verle pronto!
-          </div>
-        </div>
-      )}
+
 
       {/* CORTE DE CAJA IMPRIMIBLE (Solo visible al imprimir) */}
       {printMode === "corte" && ventasFiltradas.length > 0 && (
@@ -1259,7 +1269,7 @@ export default function ReportesPage() {
         </div>
       )}
 
-      {/* Estilos para impresión del Ticket / Corte de Caja - Garantiza 1 Sola Página */}
+      {/* Estilos para impresión - Optimizado para POS80 (80mm) */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           html, body {
@@ -1267,51 +1277,48 @@ export default function ReportesPage() {
             color: black !important;
             margin: 0 !important;
             padding: 0 !important;
+            width: 80mm !important;
             height: auto !important;
-            min-height: 0 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
           }
           
-          /* Ocultar absolutamente todo en el DOM */
           body * {
             visibility: hidden !important;
           }
           
-          /* Hacer visible el ticket o el corte correspondiente */
-          #ticket-print, #ticket-print *,
           #corte-print, #corte-print * {
             visibility: visible !important;
+            color: black !important;
           }
           
-          /* Colapsar en la posición fija 0,0 para que no sume espacio de otros elementos */
-          #ticket-print, #corte-print {
+          #corte-print {
             visibility: visible !important;
             display: block !important;
-            position: fixed !important;
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 72mm !important;
-            height: auto !important;
+            width: 80mm !important;
             margin: 0 !important;
-            padding: 4mm 3mm !important;
+            padding: 1mm 2mm 2mm 2mm !important;
             box-sizing: border-box !important;
             background: white !important;
             color: black !important;
             font-family: 'Courier New', Courier, monospace !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
             page-break-inside: avoid !important;
             page-break-after: avoid !important;
-            page-break-before: avoid !important;
           }
           
-          /* Ocultar cabeceras y pies de página por defecto del navegador */
           @page {
             margin: 0 !important;
-            size: auto !important;
+            padding: 0 !important;
+            size: 80mm auto !important;
           }
         }
         
         @media screen {
-          #ticket-print, #corte-print {
+          #corte-print {
             display: none !important;
           }
         }
