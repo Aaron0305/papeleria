@@ -377,7 +377,7 @@ export default function InventarioPage() {
                   <tr key={producto.id} className="hover:bg-brand-4/5 dark:hover:bg-brand-4/10 transition-colors text-foreground group">
                     <td className="p-5 text-sm font-mono text-brand-4">{producto.codigo_barras || '---'}</td>
                     <td className="p-5 font-bold">{producto.nombre}</td>
-                    <td className="p-5 text-emerald-500 dark:text-emerald-400 font-black">${producto.precio_venta}</td>
+                    <td className="p-5 text-emerald-500 dark:text-emerald-400 font-black">${Number(producto.precio_venta || 0).toFixed(2)}</td>
                     <td className="p-5">
                       <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${
                         producto.stock > 10 ? 'bg-emerald-500/10 text-emerald-500' : 
@@ -446,7 +446,7 @@ export default function InventarioPage() {
           </div>
         ) : (
           productosFiltrados.map((producto) => (
-            <div key={producto.id} className="bg-card border-none p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] flex flex-col gap-4 border border-brand-4/5 dark:border-brand-4/10">
+            <div key={producto.id} className="bg-card border-none p-5 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] flex flex-col gap-4 border border-brand-4/5 dark:border-brand-4/10 overflow-hidden">
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <span className="text-[10px] font-mono text-brand-4 block mb-1">
@@ -457,7 +457,7 @@ export default function InventarioPage() {
                   </h4>
                 </div>
                 <span className="font-black text-emerald-500 text-xl flex-shrink-0">
-                  ${producto.precio_venta}
+                  ${Number(producto.precio_venta || 0).toFixed(2)}
                 </span>
               </div>
               
@@ -465,7 +465,7 @@ export default function InventarioPage() {
                 <div className="flex flex-col">
                   <span className="text-[10px] text-brand-4 font-bold uppercase tracking-wider leading-none mb-1">Costo / Ganancia</span>
                   <span className="text-xs font-semibold text-foreground/80">
-                    ${producto.precio_costo?.toFixed(2) || '0.00'} / ${(producto.precio_venta - (producto.precio_costo || 0))?.toFixed(2)}
+                    ${Number(producto.precio_costo || 0).toFixed(2)} / ${Number((producto.precio_venta || 0) - (producto.precio_costo || 0)).toFixed(2)}
                   </span>
                 </div>
                 <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${
@@ -516,8 +516,8 @@ export default function InventarioPage() {
 
       {/* Modal Agregar/Editar */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-24">
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setModalOpen(false)}></div>
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 pt-4 sm:pt-24 overflow-y-auto">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setModalOpen(false)}></div>
           <div className="relative bg-card border-none w-full max-w-3xl rounded-3xl shadow-[0_20px_60px_rgb(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgb(0,0,0,0.3)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 bg-brand-4/5 dark:bg-brand-4/10 flex justify-between items-center z-10 shadow-sm">
               <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -533,7 +533,7 @@ export default function InventarioPage() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto max-h-[70vh] sm:max-h-none">
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Columna Izquierda: Detalles Básicos y Código */}

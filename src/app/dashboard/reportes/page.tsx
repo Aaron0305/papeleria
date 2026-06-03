@@ -300,14 +300,14 @@ export default function ReportesPage() {
 </body></html>`;
 
     // Eliminar iframe de impresión anterior si existiera
-    const iframeExistente = document.getElementById("print-iframe");
+    const iframeExistente = document.getElementById("print-iframe-ticket");
     if (iframeExistente) {
       iframeExistente.remove();
     }
 
     // Crear un iframe invisible
     const iframe = document.createElement("iframe");
-    iframe.id = "print-iframe";
+    iframe.id = "print-iframe-ticket";
     iframe.style.position = "fixed";
     iframe.style.bottom = "0";
     iframe.style.right = "0";
@@ -326,14 +326,22 @@ export default function ReportesPage() {
 
       const printWindow = iframe.contentWindow;
       if (printWindow) {
+        // Usar afterprint para eliminar el iframe solo cuando el diálogo de impresión se cierre
+        let cleaned = false;
+        const cleanup = () => {
+          if (cleaned) return;
+          cleaned = true;
+          setTimeout(() => { try { iframe.remove(); } catch(_){} }, 500);
+        };
+        printWindow.addEventListener("afterprint", cleanup);
+        // Fallback de seguridad por si afterprint no se dispara
+        const fallbackTimer = setTimeout(cleanup, 15000);
+        printWindow.addEventListener("afterprint", () => clearTimeout(fallbackTimer));
+
         printWindow.focus();
         setTimeout(() => {
           printWindow.print();
-          // Remover el iframe después de un tiempo prudente
-          setTimeout(() => {
-            iframe.remove();
-          }, 1000);
-        }, 250);
+        }, 300);
       }
     }
   };
@@ -433,9 +441,38 @@ export default function ReportesPage() {
       .order("fecha", { ascending: false });
 
     if (!error && data) {
-      setVentas(data);
+      // Traer todos los detalles de venta con sus productos por separado
+      const { data: allDetalles } = await supabase
+        .from("detalles_venta")
+        .select("*, productos(nombre)");
+
+      // Mapear detalles a cada venta
+      const detallesMap: Record<number, any[]> = {};
+      if (allDetalles) {
+        for (const det of allDetalles) {
+          const vid = det.venta_id;
+          if (!detallesMap[vid]) detallesMap[vid] = [];
+          detallesMap[vid].push(det);
+        }
+      }
+
+      const ventasConDetalles = data.map((v: any) => ({
+        ...v,
+        detalles_venta: detallesMap[v.id] || []
+      }));
+
+      setVentas(ventasConDetalles);
     }
     setLoading(false);
+  };
+
+  // Helper: resumen de productos vendidos para la tabla
+  const getProductosSummary = (venta: any): string => {
+    if (!venta.detalles_venta || venta.detalles_venta.length === 0) return "Sin detalles";
+    return venta.detalles_venta.map((d: any) => {
+      const nombre = d.descripcion_personalizada || d.productos?.nombre || "Producto";
+      return `${d.cantidad}x ${nombre}`;
+    }).join(", ");
   };
 
   const fetchUsuarios = async () => {
@@ -635,14 +672,14 @@ export default function ReportesPage() {
 </body></html>`;
 
     // Eliminar iframe de impresión anterior si existiera
-    const iframeExistente = document.getElementById("print-iframe");
+    const iframeExistente = document.getElementById("print-iframe-corte");
     if (iframeExistente) {
       iframeExistente.remove();
     }
 
     // Crear un iframe invisible
     const iframe = document.createElement("iframe");
-    iframe.id = "print-iframe";
+    iframe.id = "print-iframe-corte";
     iframe.style.position = "fixed";
     iframe.style.bottom = "0";
     iframe.style.right = "0";
@@ -661,13 +698,22 @@ export default function ReportesPage() {
 
       const printWindow = iframe.contentWindow;
       if (printWindow) {
+        // Usar afterprint para eliminar el iframe solo cuando el diálogo de impresión se cierre
+        let cleaned = false;
+        const cleanup = () => {
+          if (cleaned) return;
+          cleaned = true;
+          setTimeout(() => { try { iframe.remove(); } catch(_){} }, 500);
+        };
+        printWindow.addEventListener("afterprint", cleanup);
+        // Fallback de seguridad por si afterprint no se dispara
+        const fallbackTimer = setTimeout(cleanup, 15000);
+        printWindow.addEventListener("afterprint", () => clearTimeout(fallbackTimer));
+
         printWindow.focus();
         setTimeout(() => {
           printWindow.print();
-          setTimeout(() => {
-            iframe.remove();
-          }, 1000);
-        }, 250);
+        }, 300);
       }
     }
   };
@@ -776,6 +822,7 @@ export default function ReportesPage() {
                 <th className="p-5 font-bold">Folio / ID</th>
                 <th className="p-5 font-bold">Fecha y Hora</th>
                 <th className="p-5 font-bold">Cajero</th>
+                <th className="p-5 font-bold">Productos</th>
                 <th className="p-5 font-bold">Método</th>
                 <th className="p-5 font-bold text-right">Total</th>
                 <th className="p-5 font-bold text-center">Acciones</th>
@@ -784,13 +831,13 @@ export default function ReportesPage() {
             <tbody className="divide-y divide-brand-4/5 dark:divide-brand-4/10">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-brand-4 font-medium animate-pulse">
+                  <td colSpan={7} className="p-8 text-center text-brand-4 font-medium animate-pulse">
                     Cargando ventas...
                   </td>
                 </tr>
               ) : ventasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-brand-4">
+                  <td colSpan={7} className="p-8 text-center text-brand-4">
                     <div className="flex flex-col items-center justify-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -813,6 +860,11 @@ export default function ReportesPage() {
                       <div className="text-xs text-brand-4">{new Date(venta.fecha).toLocaleTimeString('es-MX')}</div>
                     </td>
                     <td className="p-5 font-medium">{venta.usuarios?.nombre || 'Anónimo'}</td>
+                    <td className="p-5 max-w-[200px]" title={getProductosSummary(venta)}>
+                      <div className="truncate text-xs text-foreground/70 leading-relaxed">
+                        {getProductosSummary(venta)}
+                      </div>
+                    </td>
                     <td className="p-5">
                       <span className="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-lg text-xs font-bold">
                         {venta.metodo_pago}

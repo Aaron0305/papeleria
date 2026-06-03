@@ -307,14 +307,14 @@ export default function POSPage() {
 </body></html>`;
 
     // Eliminar iframe de impresión anterior si existiera
-    const iframeExistente = document.getElementById("print-iframe");
+    const iframeExistente = document.getElementById("print-iframe-pos");
     if (iframeExistente) {
       iframeExistente.remove();
     }
 
     // Crear un iframe invisible
     const iframe = document.createElement("iframe");
-    iframe.id = "print-iframe";
+    iframe.id = "print-iframe-pos";
     iframe.style.position = "fixed";
     iframe.style.bottom = "0";
     iframe.style.right = "0";
@@ -333,14 +333,22 @@ export default function POSPage() {
 
       const printWindow = iframe.contentWindow;
       if (printWindow) {
+        // Usar afterprint para eliminar el iframe solo cuando el diálogo de impresión se cierre
+        let cleaned = false;
+        const cleanup = () => {
+          if (cleaned) return;
+          cleaned = true;
+          setTimeout(() => { try { iframe.remove(); } catch(_){} }, 500);
+        };
+        printWindow.addEventListener("afterprint", cleanup);
+        // Fallback de seguridad por si afterprint no se dispara
+        const fallbackTimer = setTimeout(cleanup, 15000);
+        printWindow.addEventListener("afterprint", () => clearTimeout(fallbackTimer));
+
         printWindow.focus();
         setTimeout(() => {
           printWindow.print();
-          // Remover el iframe después de un tiempo prudente
-          setTimeout(() => {
-            iframe.remove();
-          }, 1000);
-        }, 250);
+        }, 300);
       }
     }
   };
